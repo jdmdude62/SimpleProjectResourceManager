@@ -1,0 +1,55 @@
+/* Critical Path Network Diagram Styles */
+
+.critical-node {
+    -fx-fill: #ffcccc;
+    -fx-stroke: #ff0000;
+    -fx-stroke-width: 3;
+}
+
+.normal-node {
+    -fx-fill: white;
+    -fx-stroke: #999999;
+    -fx-stroke-width: 2;
+}
+
+.critical-path-line {
+    -fx-stroke: #ff0000;
+    -fx-stroke-width: 3;
+}
+
+.normal-path-line {
+    -fx-stroke: #999999;
+    -fx-stroke-width: 2;
+}
+
+.node-title {
+    -fx-font-weight: bold;
+    -fx-font-size: 12px;
+}
+
+.node-details {
+    -fx-font-size: 10px;
+    -fx-text-fill: #666;
+}
+
+.slack-positive {
+    -fx-text-fill: #28a745;
+    -fx-font-weight: bold;
+}
+
+.slack-zero {
+    -fx-text-fill: #dc3545;
+    -fx-font-weight: bold;
+}
+
+.legend-box {
+    -fx-background-color: #f8f8f8;
+    -fx-border-color: #ddd;
+    -fx-padding: 10;
+}
+
+.control-panel {
+    -fx-background-color: #f0f0f0;
+    -fx-border-color: #ddd;
+    -fx-padding: 10;
+}

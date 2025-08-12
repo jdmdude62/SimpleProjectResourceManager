@@ -1,0 +1,244 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.geometry.Insets?>
+
+<DialogPane xmlns="http://javafx.com/javafx/17" 
+            xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="com.subliminalsearch.simpleprojectresourcemanager.controller.DashboardSettingsController"
+            prefWidth="600.0" prefHeight="500.0">
+    
+    <header>
+        <Label text="Dashboard Settings" style="-fx-font-size: 18; -fx-font-weight: bold;"/>
+    </header>
+    
+    <content>
+        <TabPane>
+            <!-- Display Settings Tab -->
+            <Tab text="Display" closable="false">
+                <VBox spacing="15" padding="20">
+                    <HBox spacing="10" alignment="CENTER_LEFT">
+                        <Label text="Default Date Range:" prefWidth="150"/>
+                        <ComboBox fx:id="defaultDateRangeCombo" prefWidth="200">
+                            <items>
+                                <FXCollections fx:factory="observableArrayList">
+                                    <String fx:value="Last 7 Days"/>
+                                    <String fx:value="Last 30 Days"/>
+                                    <String fx:value="Last 60 Days"/>
+                                    <String fx:value="Last 90 Days"/>
+                                    <String fx:value="Current Quarter"/>
+                                    <String fx:value="Current Year"/>
+                                </FXCollections>
+                            </items>
+                        </ComboBox>
+                    </HBox>
+                    
+                    <HBox spacing="10" alignment="CENTER_LEFT">
+                        <Label text="Auto-refresh Interval:" prefWidth="150"/>
+                        <ComboBox fx:id="refreshIntervalCombo" prefWidth="200">
+                            <items>
+                                <FXCollections fx:factory="observableArrayList">
+                                    <String fx:value="Disabled"/>
+                                    <String fx:value="5 minutes"/>
+                                    <String fx:value="10 minutes"/>
+                                    <String fx:value="15 minutes"/>
+                                    <String fx:value="30 minutes"/>
+                                    <String fx:value="1 hour"/>
+                                </FXCollections>
+                            </items>
+                        </ComboBox>
+                    </HBox>
+                    
+                    <HBox spacing="10" alignment="CENTER_LEFT">
+                        <Label text="Chart Animation:" prefWidth="150"/>
+                        <CheckBox fx:id="chartAnimationCheck" text="Enable chart animations"/>
+                    </HBox>
+                    
+                    <HBox spacing="10" alignment="CENTER_LEFT">
+                        <Label text="Show Trends:" prefWidth="150"/>
+                        <CheckBox fx:id="showTrendsCheck" text="Display trend indicators" selected="true"/>
+                    </HBox>
+                    
+                    <Separator/>
+                    
+                    <Label text="KPI Card Settings" style="-fx-font-weight: bold;"/>
+                    
+                    <HBox spacing="10" alignment="CENTER_LEFT">
+                        <Label text="Decimal Places:" prefWidth="150"/>
+                        <Spinner fx:id="decimalPlacesSpinner" min="0" max="2" initialValue="1" prefWidth="100"/>
+                    </HBox>
+                    
+                    <HBox spacing="10" alignment="CENTER_LEFT">
+                        <Label text="Currency Symbol:" prefWidth="150"/>
+                        <TextField fx:id="currencySymbolField" text="$" prefWidth="100"/>
+                    </HBox>
+                </VBox>
+            </Tab>
+            
+            <!-- Business Rules Tab -->
+            <Tab text="Business Rules" closable="false">
+                <VBox spacing="15" padding="20">
+                    <Label text="Working Hours" style="-fx-font-weight: bold;"/>
+                    
+                    <HBox spacing="10" alignment="CENTER_LEFT">
+                        <Label text="Standard Day Hours:" prefWidth="150"/>
+                        <Spinner fx:id="standardHoursSpinner" min="6" max="12" initialValue="8" prefWidth="100"/>
+                        <Label text="hours"/>
+                    </HBox>
+                    
+                    <HBox spacing="10" alignment="CENTER_LEFT">
+                        <Label text="Overtime Threshold:" prefWidth="150"/>
+                        <Spinner fx:id="overtimeThresholdSpinner" min="8" max="12" initialValue="8" prefWidth="100"/>
+                        <Label text="hours/day"/>
+                    </HBox>
+                    
+                    <Separator/>
+                    
+                    <Label text="Travel Time Defaults" style="-fx-font-weight: bold;"/>
+                    
+                    <HBox spacing="10" alignment="CENTER_LEFT">
+                        <Label text="Local Jobs (< 50 mi):" prefWidth="150"/>
+                        <Spinner fx:id="localTravelSpinner" min="0" max="2" initialValue="0" prefWidth="100"/>
+                        <Label text="days"/>
+                    </HBox>
+                    
+                    <HBox spacing="10" alignment="CENTER_LEFT">
+                        <Label text="Regional (50-200 mi):" prefWidth="150"/>
+                        <Spinner fx:id="regionalTravelSpinner" min="0" max="3" initialValue="1" prefWidth="100"/>
+                        <Label text="days each way"/>
+                    </HBox>
+                    
+                    <HBox spacing="10" alignment="CENTER_LEFT">
+                        <Label text="National (> 200 mi):" prefWidth="150"/>
+                        <Spinner fx:id="nationalTravelSpinner" min="1" max="5" initialValue="2" prefWidth="100"/>
+                        <Label text="days each way"/>
+                    </HBox>
+                    
+                    <Separator/>
+                    
+                    <Label text="Resource Capacity" style="-fx-font-weight: bold;"/>
+                    
+                    <HBox spacing="10" alignment="CENTER_LEFT">
+                        <Label text="Max Concurrent Projects:" prefWidth="150"/>
+                        <Spinner fx:id="maxConcurrentSpinner" min="1" max="5" initialValue="2" prefWidth="100"/>
+                        <Label text="per technician"/>
+                    </HBox>
+                </VBox>
+            </Tab>
+            
+            <!-- Alert Thresholds Tab -->
+            <Tab text="Alert Thresholds" closable="false">
+                <VBox spacing="15" padding="20">
+                    <Label text="Resource Utilization" style="-fx-font-weight: bold;"/>
+                    
+                    <HBox spacing="10" alignment="CENTER_LEFT">
+                        <Label text="Target Utilization:" prefWidth="150"/>
+                        <Slider fx:id="targetUtilizationSlider" min="50" max="100" value="75" 
+                                showTickLabels="true" showTickMarks="true" prefWidth="200"/>
+                        <Label fx:id="targetUtilizationLabel" text="75%"/>
+                    </HBox>
+                    
+                    <HBox spacing="10" alignment="CENTER_LEFT">
+                        <Label text="Low Utilization Alert:" prefWidth="150"/>
+                        <Slider fx:id="lowUtilizationSlider" min="30" max="70" value="60" 
+                                showTickLabels="true" showTickMarks="true" prefWidth="200"/>
+                        <Label fx:id="lowUtilizationLabel" text="60%"/>
+                    </HBox>
+                    
+                    <HBox spacing="10" alignment="CENTER_LEFT">
+                        <Label text="Overallocation Alert:" prefWidth="150"/>
+                        <Slider fx:id="overallocationSlider" min="90" max="120" value="100" 
+                                showTickLabels="true" showTickMarks="true" prefWidth="200"/>
+                        <Label fx:id="overallocationLabel" text="100%"/>
+                    </HBox>
+                    
+                    <Separator/>
+                    
+                    <Label text="Project Delivery" style="-fx-font-weight: bold;"/>
+                    
+                    <HBox spacing="10" alignment="CENTER_LEFT">
+                        <Label text="On-Time Target:" prefWidth="150"/>
+                        <Slider fx:id="onTimeTargetSlider" min="80" max="100" value="95" 
+                                showTickLabels="true" showTickMarks="true" prefWidth="200"/>
+                        <Label fx:id="onTimeTargetLabel" text="95%"/>
+                    </HBox>
+                    
+                    <HBox spacing="10" alignment="CENTER_LEFT">
+                        <Label text="Deadline Warning:" prefWidth="150"/>
+                        <Spinner fx:id="deadlineWarningSpinner" min="1" max="7" initialValue="3" prefWidth="100"/>
+                        <Label text="days before"/>
+                    </HBox>
+                    
+                    <Separator/>
+                    
+                    <Label text="Financial Alerts" style="-fx-font-weight: bold;"/>
+                    
+                    <HBox spacing="10" alignment="CENTER_LEFT">
+                        <Label text="Budget Overrun Alert:" prefWidth="150"/>
+                        <Spinner fx:id="budgetOverrunSpinner" min="5" max="25" initialValue="10" prefWidth="100"/>
+                        <Label text="% over budget"/>
+                    </HBox>
+                    
+                    <HBox spacing="10" alignment="CENTER_LEFT">
+                        <Label text="Min Profit Margin:" prefWidth="150"/>
+                        <Spinner fx:id="minProfitMarginSpinner" min="10" max="50" initialValue="20" prefWidth="100"/>
+                        <Label text="%"/>
+                    </HBox>
+                </VBox>
+            </Tab>
+            
+            <!-- Seasonal Planning Tab -->
+            <Tab text="Seasonal Planning" closable="false">
+                <VBox spacing="15" padding="20">
+                    <Label text="Peak Season Configuration" style="-fx-font-weight: bold;"/>
+                    
+                    <HBox spacing="10" alignment="CENTER_LEFT">
+                        <Label text="Garden Peak Months:" prefWidth="150"/>
+                        <CheckBox fx:id="gardenAprCheck" text="Apr"/>
+                        <CheckBox fx:id="gardenMayCheck" text="May" selected="true"/>
+                        <CheckBox fx:id="gardenJunCheck" text="Jun" selected="true"/>
+                        <CheckBox fx:id="gardenJulCheck" text="Jul" selected="true"/>
+                        <CheckBox fx:id="gardenAugCheck" text="Aug" selected="true"/>
+                    </HBox>
+                    
+                    <HBox spacing="10" alignment="CENTER_LEFT">
+                        <Label text="Doghouse Peak Months:" prefWidth="150"/>
+                        <CheckBox fx:id="dogSepCheck" text="Sep" selected="true"/>
+                        <CheckBox fx:id="dogOctCheck" text="Oct" selected="true"/>
+                        <CheckBox fx:id="dogNovCheck" text="Nov" selected="true"/>
+                    </HBox>
+                    
+                    <Separator/>
+                    
+                    <Label text="Resource Planning" style="-fx-font-weight: bold;"/>
+                    
+                    <HBox spacing="10" alignment="CENTER_LEFT">
+                        <Label text="Min Coverage (Off-Peak):" prefWidth="150"/>
+                        <Spinner fx:id="minCoverageOffPeakSpinner" min="50" max="100" initialValue="70" prefWidth="100"/>
+                        <Label text="% resources"/>
+                    </HBox>
+                    
+                    <HBox spacing="10" alignment="CENTER_LEFT">
+                        <Label text="Min Coverage (Peak):" prefWidth="150"/>
+                        <Spinner fx:id="minCoveragePeakSpinner" min="80" max="100" initialValue="90" prefWidth="100"/>
+                        <Label text="% resources"/>
+                    </HBox>
+                    
+                    <HBox spacing="10" alignment="CENTER_LEFT">
+                        <Label text="Vacation Blackout:" prefWidth="150"/>
+                        <CheckBox fx:id="vacationBlackoutCheck" text="Restrict vacations during peak season"/>
+                    </HBox>
+                </VBox>
+            </Tab>
+        </TabPane>
+    </content>
+    
+    <buttonTypes>
+        <ButtonType fx:constant="OK"/>
+        <ButtonType fx:constant="CANCEL"/>
+        <ButtonType text="Apply" buttonData="OTHER"/>
+        <ButtonType text="Reset to Defaults" buttonData="LEFT"/>
+    </buttonTypes>
+    
+</DialogPane>

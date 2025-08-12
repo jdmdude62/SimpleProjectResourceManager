@@ -1,0 +1,115 @@
+/* Calendar Matrix View Styles */
+
+.calendar-grid {
+    -fx-background-color: #f0f0f0;
+    -fx-padding: 10;
+}
+
+.calendar-day-header {
+    -fx-background-color: #d0d0d0;
+    -fx-font-weight: bold;
+    -fx-font-size: 12px;
+    -fx-padding: 5;
+    -fx-alignment: center;
+}
+
+.calendar-day-cell {
+    -fx-background-color: white;
+    -fx-border-color: #ddd;
+    -fx-border-width: 1;
+    -fx-padding: 5;
+    -fx-min-height: 120;
+}
+
+.calendar-day-cell:hover {
+    -fx-background-color: #f8f8f8;
+    -fx-border-color: #007bff;
+    -fx-border-width: 2;
+    -fx-cursor: hand;
+}
+
+.calendar-day-today {
+    -fx-background-color: #e6f3ff;
+    -fx-border-color: #007bff;
+    -fx-border-width: 2;
+}
+
+.calendar-day-weekend {
+    -fx-background-color: #f5f5f5;
+}
+
+.calendar-day-number {
+    -fx-font-weight: bold;
+    -fx-font-size: 14px;
+}
+
+.calendar-task-count {
+    -fx-font-size: 10px;
+    -fx-text-fill: #666;
+}
+
+.calendar-task-item {
+    -fx-font-size: 10px;
+    -fx-padding: 2;
+}
+
+.task-priority-critical {
+    -fx-text-fill: #dc3545;
+}
+
+.task-priority-high {
+    -fx-text-fill: #fd7e14;
+}
+
+.task-priority-medium {
+    -fx-text-fill: #ffc107;
+}
+
+.task-priority-low {
+    -fx-text-fill: #28a745;
+}
+
+.task-status-completed {
+    -fx-text-fill: #28a745;
+    -fx-font-style: italic;
+}
+
+.task-status-in-progress {
+    -fx-text-fill: #007bff;
+}
+
+.task-status-blocked {
+    -fx-text-fill: #dc3545;
+    -fx-font-weight: bold;
+}
+
+.task-status-review {
+    -fx-text-fill: #6f42c1;
+}
+
+.calendar-header {
+    -fx-background-color: #e8e8e8;
+    -fx-border-color: #ccc;
+    -fx-padding: 10;
+}
+
+.calendar-navigation-button {
+    -fx-background-color: #f0f0f0;
+    -fx-padding: 5 10;
+    -fx-cursor: hand;
+}
+
+.calendar-navigation-button:hover {
+    -fx-background-color: #e0e0e0;
+}
+
+.calendar-month-label {
+    -fx-font-size: 18px;
+    -fx-font-weight: bold;
+}
+
+.calendar-legend {
+    -fx-background-color: #f8f8f8;
+    -fx-border-color: #ddd;
+    -fx-padding: 5;
+}

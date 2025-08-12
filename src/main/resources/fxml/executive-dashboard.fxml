@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.chart.*?>
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.text.*?>
+
+<BorderPane xmlns="http://javafx.com/javafx/17" 
+            xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="com.subliminalsearch.simpleprojectresourcemanager.controller.ExecutiveDashboardController"
+            prefHeight="800.0" prefWidth="1200.0">
+    
+    <!-- Top Menu Bar -->
+    <top>
+        <VBox>
+            <MenuBar>
+                <Menu text="File">
+                    <MenuItem text="Export to PDF" onAction="#exportToPDF"/>
+                    <MenuItem text="Print Dashboard" onAction="#printDashboard"/>
+                    <SeparatorMenuItem/>
+                    <MenuItem text="Close" onAction="#closeDashboard"/>
+                </Menu>
+                <Menu text="View">
+                    <MenuItem text="Refresh" onAction="#refreshDashboard" accelerator="F5"/>
+                    <CheckMenuItem text="Auto-refresh" fx:id="autoRefreshMenuItem"/>
+                    <SeparatorMenuItem/>
+                    <RadioMenuItem text="Monthly View" fx:id="monthlyViewItem" selected="true">
+                        <toggleGroup>
+                            <ToggleGroup fx:id="viewToggleGroup"/>
+                        </toggleGroup>
+                    </RadioMenuItem>
+                    <RadioMenuItem text="Quarterly View" fx:id="quarterlyViewItem" toggleGroup="$viewToggleGroup"/>
+                    <RadioMenuItem text="Annual View" fx:id="annualViewItem" toggleGroup="$viewToggleGroup"/>
+                </Menu>
+                <Menu text="Settings">
+                    <MenuItem text="Dashboard Settings..." onAction="#openSettings"/>
+                    <MenuItem text="Financial Parameters..." onAction="#openFinancialSettings"/>
+                    <MenuItem text="Alert Thresholds..." onAction="#openAlertSettings"/>
+                    <SeparatorMenuItem/>
+                    <MenuItem text="Save Current Layout" onAction="#saveLayout"/>
+                    <MenuItem text="Reset to Defaults" onAction="#resetDefaults"/>
+                </Menu>
+                <Menu text="Reports">
+                    <MenuItem text="Resource Utilization" onAction="#showResourceReport"/>
+                    <MenuItem text="Project Pipeline" onAction="#showPipelineReport"/>
+                    <MenuItem text="Financial Summary" onAction="#showFinancialReport"/>
+                    <MenuItem text="Geographic Analysis" onAction="#showGeographicReport"/>
+                </Menu>
+            </MenuBar>
+            
+            <!-- Control Bar -->
+            <ToolBar>
+                <Label text="Date Range:"/>
+                <ComboBox fx:id="dateRangeCombo" prefWidth="150">
+                    <value>Last 30 Days</value>
+                </ComboBox>
+                <Separator orientation="VERTICAL"/>
+                <Label text="Project Type:"/>
+                <ComboBox fx:id="projectTypeCombo" prefWidth="120">
+                    <value>All Types</value>
+                </ComboBox>
+                <Separator orientation="VERTICAL"/>
+                <Button text="⟲ Refresh" onAction="#refreshDashboard"/>
+                <Region HBox.hgrow="ALWAYS"/>
+                <Label fx:id="lastUpdateLabel" text="Last updated: --:--"/>
+            </ToolBar>
+        </VBox>
+    </top>
+    
+    <!-- Main Dashboard Content -->
+    <center>
+        <ScrollPane fitToWidth="true" fitToHeight="true">
+            <VBox spacing="20" padding="20">
+                
+                <!-- KPI Cards Row -->
+                <HBox spacing="15" alignment="CENTER">
+                    <VBox styleClass="kpi-card" prefWidth="200" prefHeight="100" alignment="CENTER">
+                        <Label text="Active Projects" styleClass="kpi-title"/>
+                        <Label fx:id="activeProjectsLabel" text="--" styleClass="kpi-value"/>
+                        <Label fx:id="projectsTrendLabel" text="↑ 0%" styleClass="kpi-trend"/>
+                    </VBox>
+                    
+                    <VBox styleClass="kpi-card" prefWidth="200" prefHeight="100" alignment="CENTER">
+                        <Label text="Resource Utilization" styleClass="kpi-title"/>
+                        <Label fx:id="utilizationLabel" text="--%" styleClass="kpi-value"/>
+                        <ProgressBar fx:id="utilizationBar" prefWidth="150"/>
+                    </VBox>
+                    
+                    <VBox styleClass="kpi-card" prefWidth="200" prefHeight="100" alignment="CENTER">
+                        <Label text="On-Time Delivery" styleClass="kpi-title"/>
+                        <Label fx:id="onTimeLabel" text="--%" styleClass="kpi-value"/>
+                        <Label fx:id="onTimeTrendLabel" text="→ 0%" styleClass="kpi-trend"/>
+                    </VBox>
+                    
+                    <VBox styleClass="kpi-card" prefWidth="200" prefHeight="100" alignment="CENTER">
+                        <Label text="Monthly Revenue" styleClass="kpi-title"/>
+                        <Label fx:id="revenueLabel" text="$--" styleClass="kpi-value"/>
+                        <Label fx:id="revenueTrendLabel" text="↑ 0%" styleClass="kpi-trend"/>
+                    </VBox>
+                    
+                    <VBox styleClass="kpi-card" prefWidth="200" prefHeight="100" alignment="CENTER">
+                        <Label text="Completion Rate" styleClass="kpi-title"/>
+                        <Label fx:id="completionLabel" text="--%" styleClass="kpi-value"/>
+                        <PieChart fx:id="completionPie" prefHeight="60" prefWidth="60" legendVisible="false"/>
+                    </VBox>
+                </HBox>
+                
+                <!-- Charts Row 1 -->
+                <HBox spacing="20">
+                    <VBox spacing="10" HBox.hgrow="ALWAYS">
+                        <Label text="Project Volume Trend" styleClass="chart-title"/>
+                        <LineChart fx:id="volumeTrendChart" prefHeight="250" animated="false">
+                            <xAxis>
+                                <CategoryAxis label="Month"/>
+                            </xAxis>
+                            <yAxis>
+                                <NumberAxis label="Projects"/>
+                            </yAxis>
+                        </LineChart>
+                    </VBox>
+                    
+                    <VBox spacing="10" HBox.hgrow="ALWAYS">
+                        <Label text="Project Type Distribution" styleClass="chart-title"/>
+                        <PieChart fx:id="projectTypeChart" prefHeight="250"/>
+                    </VBox>
+                </HBox>
+                
+                <!-- Charts Row 2 -->
+                <HBox spacing="20">
+                    <VBox spacing="10" HBox.hgrow="ALWAYS">
+                        <Label text="Resource Allocation" styleClass="chart-title"/>
+                        <BarChart fx:id="resourceChart" prefHeight="250" animated="false">
+                            <xAxis>
+                                <CategoryAxis label="Resource"/>
+                            </xAxis>
+                            <yAxis>
+                                <NumberAxis label="Hours"/>
+                            </yAxis>
+                        </BarChart>
+                    </VBox>
+                    
+                    <VBox spacing="10" HBox.hgrow="ALWAYS">
+                        <Label text="Geographic Distribution" styleClass="chart-title"/>
+                        <StackedBarChart fx:id="geoChart" prefHeight="250" animated="false">
+                            <xAxis>
+                                <CategoryAxis label="State"/>
+                            </xAxis>
+                            <yAxis>
+                                <NumberAxis label="Projects"/>
+                            </yAxis>
+                        </StackedBarChart>
+                    </VBox>
+                </HBox>
+                
+                <!-- Alerts Section -->
+                <VBox spacing="10">
+                    <Label text="Alerts & Notifications" styleClass="section-title"/>
+                    <ListView fx:id="alertsList" prefHeight="100" />
+                </VBox>
+                
+            </VBox>
+        </ScrollPane>
+    </center>
+    
+    <!-- Status Bar -->
+    <bottom>
+        <HBox styleClass="status-bar" spacing="10" padding="5">
+            <Label fx:id="statusLabel" text="Ready"/>
+            <Region HBox.hgrow="ALWAYS"/>
+            <Label fx:id="projectCountLabel" text="Projects: 0"/>
+            <Separator orientation="VERTICAL"/>
+            <Label fx:id="resourceCountLabel" text="Resources: 0"/>
+            <Separator orientation="VERTICAL"/>
+            <Label fx:id="refreshIntervalLabel" text="Auto-refresh: OFF"/>
+        </HBox>
+    </bottom>
+    
+</BorderPane>

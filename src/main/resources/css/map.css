@@ -1,0 +1,106 @@
+/* Map View Styles */
+
+.map-container {
+    -fx-background-color: #f0f0f0;
+}
+
+.map-controls {
+    -fx-background-color: white;
+    -fx-border-color: #ddd;
+    -fx-padding: 10;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 5, 0, 0, 2);
+}
+
+.route-panel {
+    -fx-background-color: white;
+    -fx-border-color: #ddd;
+    -fx-padding: 10;
+}
+
+.route-stop-card {
+    -fx-background-color: #f8f8f8;
+    -fx-border-color: #ddd;
+    -fx-border-radius: 5;
+    -fx-padding: 10;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.05), 3, 0, 0, 1);
+}
+
+.route-stop-card:hover {
+    -fx-background-color: #e8f4f8;
+    -fx-border-color: #007bff;
+}
+
+.stop-number {
+    -fx-font-weight: bold;
+    -fx-text-fill: #007bff;
+    -fx-font-size: 12px;
+}
+
+.location-marker-critical {
+    -fx-fill: #dc3545;
+    -fx-stroke: black;
+    -fx-stroke-width: 2;
+}
+
+.location-marker-high {
+    -fx-fill: #fd7e14;
+    -fx-stroke: black;
+    -fx-stroke-width: 2;
+}
+
+.location-marker-normal {
+    -fx-fill: #007bff;
+    -fx-stroke: black;
+    -fx-stroke-width: 2;
+}
+
+.location-marker-office {
+    -fx-fill: #28a745;
+    -fx-stroke: black;
+    -fx-stroke-width: 3;
+}
+
+.route-line {
+    -fx-stroke: #007bff;
+    -fx-stroke-width: 3;
+    -fx-stroke-dash-array: 5 5;
+}
+
+.route-summary {
+    -fx-background-color: #e8f4f8;
+    -fx-border-color: #007bff;
+    -fx-border-width: 2;
+    -fx-border-radius: 5;
+    -fx-padding: 10;
+}
+
+.map-status-bar {
+    -fx-background-color: #f8f8f8;
+    -fx-border-color: #ddd;
+    -fx-padding: 5 10;
+}
+
+.distance-label {
+    -fx-font-weight: bold;
+    -fx-text-fill: #333;
+}
+
+.time-label {
+    -fx-font-weight: bold;
+    -fx-text-fill: #666;
+}
+
+.efficiency-good {
+    -fx-text-fill: #28a745;
+}
+
+.efficiency-poor {
+    -fx-text-fill: #dc3545;
+}
+
+.map-legend {
+    -fx-background-color: white;
+    -fx-border-color: #ddd;
+    -fx-padding: 10;
+    -fx-opacity: 0.9;
+}
