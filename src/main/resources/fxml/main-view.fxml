@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<BorderPane fx:id="mainBorderPane" xmlns="http://javafx.com/javafx/17.0.2-ea" xmlns:fx="http://javafx.com/fxml/1">
+   <top>
+      <VBox>
+         <!-- Menu Bar -->
+         <MenuBar fx:id="menuBar">
+            <Menu text="File">
+               <MenuItem fx:id="menuNewProject" text="New Project..." />
+               <MenuItem fx:id="menuNewResource" text="New Resource..." />
+               <MenuItem fx:id="menuNewAssignment" text="New Assignment..." />
+               <SeparatorMenuItem />
+               <MenuItem fx:id="menuProjectManagers" text="Manage Project Managers..." />
+               <MenuItem fx:id="menuProjectGrid" text="Project Grid Editor..." />
+               <MenuItem fx:id="menuProjectTasks" text="Project Tasks..." />
+               <MenuItem fx:id="menuTechUnavailability" text="Technician Unavailability..." />
+               <MenuItem fx:id="menuHolidayCalendar" text="Holiday Calendar..." />
+               <SeparatorMenuItem />
+               <MenuItem fx:id="menuLoadGardenData" text="Load Garden Demo Data..." />
+               <MenuItem fx:id="menuClearOldData" text="Clear Old Test Data..." />
+               <SeparatorMenuItem />
+               <MenuItem text="Import..." />
+               <MenuItem text="Export..." />
+               <SeparatorMenuItem />
+               <MenuItem text="Exit" />
+            </Menu>
+            <Menu text="Edit">
+               <MenuItem text="Undo" />
+               <MenuItem text="Redo" />
+               <SeparatorMenuItem />
+               <MenuItem text="Cut" />
+               <MenuItem text="Copy" />
+               <MenuItem text="Paste" />
+            </Menu>
+            <Menu text="View">
+               <MenuItem text="Refresh" />
+               <SeparatorMenuItem />
+               <RadioMenuItem text="Day View" />
+               <RadioMenuItem text="Week View" />
+               <RadioMenuItem text="Month View" selected="true" />
+               <RadioMenuItem text="Quarter View" />
+               <RadioMenuItem text="Year View" />
+               <SeparatorMenuItem />
+               <MenuItem fx:id="menuHolidayCalendarView" text="Holiday Calendar" />
+               <MenuItem fx:id="menuResourceAvailabilityView" text="Resource Availability" />
+               <SeparatorMenuItem />
+               <MenuItem fx:id="menuExecutiveDashboard" text="Executive Dashboard" onAction="#openExecutiveDashboard" />
+            </Menu>
+            <Menu text="Tools">
+               <MenuItem fx:id="menuReportCenter" text="Report Center..." />
+               <MenuItem text="Sync to SharePoint..." />
+               <SeparatorMenuItem />
+               <MenuItem fx:id="menuEmailSettings" text="Email Settings..." />
+               <MenuItem text="Settings..." />
+            </Menu>
+            <Menu text="Help">
+               <MenuItem text="User Guide" />
+               <MenuItem text="Keyboard Shortcuts" />
+               <SeparatorMenuItem />
+               <MenuItem text="About" />
+            </Menu>
+         </MenuBar>
+         
+         <!-- Tool Bar -->
+         <ToolBar fx:id="toolBar" prefHeight="50" minHeight="50">
+            <!-- Navigation Controls -->
+            <Button fx:id="btnPrevMonth" text="◀◀◀" prefWidth="50" minWidth="50" prefHeight="36" minHeight="36">
+               <tooltip><Tooltip text="Previous Month" /></tooltip>
+            </Button>
+            <Button fx:id="btnPrevWeek" text="◀◀" prefWidth="40" minWidth="40" prefHeight="36" minHeight="36">
+               <tooltip><Tooltip text="Previous Week" /></tooltip>
+            </Button>
+            <Button fx:id="btnPrevDay" text="◀" prefWidth="30" minWidth="30" prefHeight="36" minHeight="36">
+               <tooltip><Tooltip text="Previous Day" /></tooltip>
+            </Button>
+            <Separator orientation="VERTICAL" />
+            <Button fx:id="btnToday" text="Today" prefWidth="70" minWidth="70" prefHeight="36" minHeight="36">
+               <tooltip><Tooltip text="Go to Today" /></tooltip>
+            </Button>
+            <Separator orientation="VERTICAL" />
+            <Button fx:id="btnNextDay" text="▶" prefWidth="30" minWidth="30" prefHeight="36" minHeight="36">
+               <tooltip><Tooltip text="Next Day" /></tooltip>
+            </Button>
+            <Button fx:id="btnNextWeek" text="▶▶" prefWidth="40" minWidth="40" prefHeight="36" minHeight="36">
+               <tooltip><Tooltip text="Next Week" /></tooltip>
+            </Button>
+            <Button fx:id="btnNextMonth" text="▶▶▶" prefWidth="50" minWidth="50" prefHeight="36" minHeight="36">
+               <tooltip><Tooltip text="Next Month" /></tooltip>
+            </Button>
+            <Separator orientation="VERTICAL" />
+            
+            <!-- View Controls -->
+            <Label text="View:" />
+            <ComboBox fx:id="viewModeCombo" prefWidth="100.0" />
+            <Label text="Date:" />
+            <DatePicker fx:id="currentDatePicker" prefWidth="140.0" />
+            <Separator orientation="VERTICAL" />
+            
+            <!-- Zoom Controls -->
+            <Label text="Zoom:" />
+            <ComboBox fx:id="zoomCombo" prefWidth="90.0" />
+            <Separator orientation="VERTICAL" />
+            
+            <!-- Action Buttons -->
+            <Button fx:id="btnNewProject" text="+ Project" styleClass="btn-success" prefWidth="120" minWidth="120" prefHeight="36" minHeight="36" />
+            <Button fx:id="btnNewResource" text="+ Resource" styleClass="btn-info" prefWidth="130" minWidth="130" prefHeight="36" minHeight="36" />
+            <Button fx:id="btnNewAssignment" text="+ Assignment" styleClass="btn-primary" prefWidth="140" minWidth="140" prefHeight="36" minHeight="36" />
+            <Separator orientation="VERTICAL" />
+            <Button fx:id="btnEditSelected" text="Edit" styleClass="btn-warning" disable="true" prefWidth="90" minWidth="90" prefHeight="36" minHeight="36" />
+            <Button fx:id="btnDeleteSelected" text="Delete" styleClass="btn-danger" disable="true" prefWidth="100" minWidth="100" prefHeight="36" minHeight="36" />
+            <Separator orientation="VERTICAL" />
+            <Button fx:id="btnExecutiveView" text="Executive Review" styleClass="btn-executive" prefWidth="200" prefHeight="32" />
+         </ToolBar>
+      </VBox>
+   </top>
+   
+   <left>
+      <!-- Filter Panel -->
+      <VBox fx:id="filterPanel" prefWidth="200.0" spacing="10.0" styleClass="filter-panel">
+         <padding>
+            <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
+         </padding>
+         
+         <Label text="Filters" styleClass="h4" />
+         
+         <VBox spacing="5.0">
+            <Label text="Project Manager:" />
+            <ComboBox fx:id="projectManagerFilter" prefWidth="180.0" promptText="All Managers" />
+         </VBox>
+         
+         <VBox spacing="5.0">
+            <Label text="Project:" />
+            <ComboBox fx:id="projectFilter" prefWidth="180.0" />
+         </VBox>
+         
+         <VBox spacing="5.0">
+            <Label text="Resource:" />
+            <ComboBox fx:id="resourceFilter" prefWidth="180.0" />
+         </VBox>
+         
+         <VBox spacing="5.0">
+            <Label text="Status:" />
+            <ComboBox fx:id="statusFilter" prefWidth="180.0" />
+         </VBox>
+         
+         <Button fx:id="btnClearFilters" text="Clear Filters" prefWidth="180.0" />
+      </VBox>
+   </left>
+   
+   <center>
+      <!-- Timeline Container -->
+      <BorderPane fx:id="timelineContainer" styleClass="timeline-container">
+         <!-- Timeline component will be injected here by the controller -->
+      </BorderPane>
+   </center>
+   
+   <bottom>
+      <!-- Status Bar -->
+      <HBox styleClass="status-bar" alignment="CENTER_LEFT" spacing="10.0">
+         <padding>
+            <Insets bottom="5.0" left="10.0" right="10.0" top="5.0" />
+         </padding>
+         <Label fx:id="statusLabel" text="Ready" />
+         <Pane HBox.hgrow="ALWAYS" />
+         <Label text="Simple Project Resource Manager v1.0" styleClass="text-muted" />
+      </HBox>
+   </bottom>
+</BorderPane>

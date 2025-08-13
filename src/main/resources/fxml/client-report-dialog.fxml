@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<DialogPane xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="com.subliminalsearch.simpleprojectresourcemanager.controller.ClientReportController"
+            prefWidth="600" prefHeight="500">
+    
+    <header>
+        <Label text="Generate Client Report" styleClass="h2"/>
+    </header>
+    
+    <content>
+        <VBox spacing="20">
+            <padding>
+                <Insets top="10" right="10" bottom="10" left="10"/>
+            </padding>
+            
+            <!-- Project Information -->
+            <VBox spacing="10">
+                <Label text="Project Information" styleClass="h4"/>
+                <GridPane hgap="10" vgap="5">
+                    <Label text="Project ID:" GridPane.columnIndex="0" GridPane.rowIndex="0"/>
+                    <Label fx:id="projectIdLabel" GridPane.columnIndex="1" GridPane.rowIndex="0" styleClass="bold"/>
+                    
+                    <Label text="Status:" GridPane.columnIndex="0" GridPane.rowIndex="1"/>
+                    <Label fx:id="projectStatusLabel" GridPane.columnIndex="1" GridPane.rowIndex="1"/>
+                    
+                    <Label text="Client Name:" GridPane.columnIndex="0" GridPane.rowIndex="2"/>
+                    <Label fx:id="clientNameLabel" GridPane.columnIndex="1" GridPane.rowIndex="2"/>
+                    
+                    <Label text="Client Email:" GridPane.columnIndex="0" GridPane.rowIndex="3"/>
+                    <Label fx:id="clientEmailLabel" GridPane.columnIndex="1" GridPane.rowIndex="3"/>
+                </GridPane>
+            </VBox>
+            
+            <Separator/>
+            
+            <!-- Email Options -->
+            <VBox spacing="10">
+                <CheckBox fx:id="sendEmailCheckBox" text="Send report via email" selected="false"/>
+                
+                <VBox spacing="5" disable="true">
+                    <Label text="Email Addresses (semicolon-separated):"/>
+                    <TextArea fx:id="emailAddressesTextArea" prefRowCount="2" wrapText="true"
+                             promptText="email1@example.com; email2@example.com"/>
+                </VBox>
+                
+                <VBox spacing="5" disable="true">
+                    <Label text="Subject:"/>
+                    <TextField fx:id="subjectField" promptText="Report subject line"/>
+                </VBox>
+                
+                <VBox spacing="5" disable="true">
+                    <Label text="Message:"/>
+                    <TextArea fx:id="messageTextArea" prefRowCount="6" wrapText="true"
+                             promptText="Email message body"/>
+                </VBox>
+            </VBox>
+            
+            <!-- Progress -->
+            <VBox spacing="5">
+                <ProgressBar fx:id="progressBar" prefWidth="Infinity" visible="false"/>
+                <Label fx:id="statusLabel" text="Ready to generate report"/>
+            </VBox>
+        </VBox>
+    </content>
+    
+    <buttonTypes>
+        <ButtonType fx:id="generateButtonType" text="Generate Report" buttonData="OK_DONE"/>
+        <ButtonType fx:id="sendButtonType" text="Send Email" buttonData="OTHER"/>
+        <ButtonType fx:id="previewButtonType" text="Preview" buttonData="OTHER"/>
+        <ButtonType text="Close" buttonData="CANCEL_CLOSE"/>
+    </buttonTypes>
+    
+    <fx:define>
+        <Button fx:id="generateButton" onAction="#generateReport"/>
+        <Button fx:id="sendButton" onAction="#sendReport"/>
+    </fx:define>
+</DialogPane>

@@ -1,0 +1,131 @@
+/* Kanban Board Styles */
+
+.kanban-column {
+    -fx-background-color: #f8f8f8;
+    -fx-background-radius: 5;
+    -fx-padding: 10;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 5, 0, 0, 2);
+}
+
+.kanban-card {
+    -fx-background-color: white;
+    -fx-background-radius: 5;
+    -fx-border-color: #ddd;
+    -fx-border-radius: 5;
+    -fx-padding: 10;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 3, 0, 0, 1);
+}
+
+.kanban-card:hover {
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.2), 5, 0, 0, 2);
+    -fx-border-color: #007bff;
+}
+
+.kanban-card-dragging {
+    -fx-opacity: 0.5;
+}
+
+.kanban-column-highlight {
+    -fx-background-color: #e8f4f8;
+    -fx-border-color: #007bff;
+    -fx-border-width: 2;
+}
+
+.priority-critical {
+    -fx-fill: #dc3545;
+}
+
+.priority-high {
+    -fx-fill: #fd7e14;
+}
+
+.priority-medium {
+    -fx-fill: #ffc107;
+}
+
+.priority-low {
+    -fx-fill: #28a745;
+}
+
+.status-tag {
+    -fx-padding: 2 5;
+    -fx-background-radius: 3;
+    -fx-font-size: 10px;
+    -fx-font-weight: bold;
+}
+
+.tag-blocked {
+    -fx-background-color: #dc3545;
+    -fx-text-fill: white;
+}
+
+.tag-on-site {
+    -fx-background-color: #28a745;
+    -fx-text-fill: white;
+}
+
+.tag-weather {
+    -fx-background-color: #17a2b8;
+    -fx-text-fill: white;
+}
+
+.tag-materials {
+    -fx-background-color: #fd7e14;
+    -fx-text-fill: white;
+}
+
+.overdue-task {
+    -fx-border-color: #dc3545;
+    -fx-border-width: 2;
+}
+
+.task-progress {
+    -fx-accent: #28a745;
+}
+
+/* Column specific colors */
+.column-backlog {
+    -fx-border-color: #6c757d;
+    -fx-border-width: 3 0 0 0;
+}
+
+.column-ready {
+    -fx-border-color: #17a2b8;
+    -fx-border-width: 3 0 0 0;
+}
+
+.column-progress {
+    -fx-border-color: #ffc107;
+    -fx-border-width: 3 0 0 0;
+}
+
+.column-onsite {
+    -fx-border-color: #28a745;
+    -fx-border-width: 3 0 0 0;
+}
+
+.column-materials {
+    -fx-border-color: #fd7e14;
+    -fx-border-width: 3 0 0 0;
+}
+
+.column-weather {
+    -fx-border-color: #dc3545;
+    -fx-border-width: 3 0 0 0;
+}
+
+.column-review {
+    -fx-border-color: #6f42c1;
+    -fx-border-width: 3 0 0 0;
+}
+
+.column-completed {
+    -fx-border-color: #28a745;
+    -fx-border-width: 3 0 0 0;
+}
+
+.column-blocked {
+    -fx-border-color: #dc3545;
+    -fx-border-width: 3 0 0 0;
+}

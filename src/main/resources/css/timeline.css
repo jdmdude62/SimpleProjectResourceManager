@@ -1,0 +1,165 @@
+/* Resource Timeline Styles */
+
+.timeline-grid {
+    -fx-background-color: white;
+    -fx-border-color: #ddd;
+}
+
+.timeline-header {
+    -fx-background-color: #e0e0e0;
+    -fx-font-weight: bold;
+    -fx-padding: 5;
+    -fx-border-color: #ccc;
+    -fx-border-width: 0 1 1 0;
+}
+
+.timeline-resource-header {
+    -fx-background-color: #f0f0f0;
+    -fx-font-weight: bold;
+    -fx-padding: 5;
+    -fx-border-color: #ccc;
+    -fx-border-width: 0 1 1 0;
+    -fx-min-width: 150;
+}
+
+.timeline-cell {
+    -fx-border-color: #e0e0e0;
+    -fx-border-width: 0.5;
+    -fx-min-width: 40;
+    -fx-min-height: 30;
+}
+
+.timeline-weekend {
+    -fx-background-color: #f5f5f5;
+}
+
+.timeline-today {
+    -fx-border-color: #007bff;
+    -fx-border-width: 2;
+    -fx-background-color: #e6f3ff;
+}
+
+.utilization-available {
+    -fx-background-color: #90ee90;
+}
+
+.utilization-low {
+    -fx-background-color: #add8e6;
+}
+
+.utilization-medium {
+    -fx-background-color: #ffff99;
+}
+
+.utilization-high {
+    -fx-background-color: #ffa500;
+}
+
+.utilization-overallocated {
+    -fx-background-color: #ff6b6b;
+}
+
+.utilization-blocked {
+    -fx-background-color: #8b0000;
+}
+
+.timeline-controls {
+    -fx-background-color: #f8f8f8;
+    -fx-padding: 10;
+    -fx-spacing: 10;
+    -fx-border-color: #ddd;
+    -fx-border-width: 0 0 1 0;
+}
+
+.timeline-legend {
+    -fx-background-color: white;
+    -fx-padding: 5;
+    -fx-spacing: 15;
+    -fx-border-color: #ddd;
+    -fx-border-width: 0 0 1 0;
+}
+
+.timeline-legend-item {
+    -fx-spacing: 5;
+}
+
+.timeline-summary-row {
+    -fx-background-color: #d0d0d0;
+    -fx-font-weight: bold;
+    -fx-border-color: #999;
+    -fx-border-width: 2 0 0 0;
+}
+
+.task-indicator-critical {
+    -fx-fill: #dc3545;
+    -fx-font-size: 8px;
+}
+
+.task-indicator-high {
+    -fx-fill: #fd7e14;
+    -fx-font-size: 8px;
+}
+
+.task-indicator-medium {
+    -fx-fill: #ffc107;
+    -fx-font-size: 8px;
+}
+
+.task-indicator-low {
+    -fx-fill: #28a745;
+    -fx-font-size: 8px;
+}
+
+.timeline-tooltip {
+    -fx-background-color: white;
+    -fx-text-fill: black;
+    -fx-padding: 5;
+    -fx-border-color: #666;
+    -fx-border-width: 1;
+    -fx-font-size: 11px;
+}
+
+.timeline-quick-button {
+    -fx-background-color: #f0f0f0;
+    -fx-text-fill: #333;
+    -fx-padding: 5 10;
+    -fx-cursor: hand;
+}
+
+.timeline-quick-button:hover {
+    -fx-background-color: #e0e0e0;
+}
+
+.timeline-quick-button:pressed {
+    -fx-background-color: #d0d0d0;
+}
+
+.capacity-low {
+    -fx-background-color: #90ee90;
+}
+
+.capacity-medium {
+    -fx-background-color: #ffff99;
+}
+
+.capacity-high {
+    -fx-background-color: #ffb3b3;
+}
+
+.day-details-dialog {
+    -fx-background-color: white;
+    -fx-padding: 10;
+}
+
+.day-task-card {
+    -fx-background-color: white;
+    -fx-border-color: #ddd;
+    -fx-border-radius: 3;
+    -fx-padding: 10;
+    -fx-spacing: 5;
+}
+
+.day-task-card:hover {
+    -fx-border-color: #007bff;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 5, 0, 0, 2);
+}

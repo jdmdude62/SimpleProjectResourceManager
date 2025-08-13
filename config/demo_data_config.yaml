@@ -1,0 +1,27 @@
+clearExisting: false
+durationVariance: 0.2
+conflictRate: 0.1
+
+projectTypes:
+  garden:
+    minPerMonth: 3
+    maxPerMonth: 8
+    peakMonths: [4, 5, 6, 7, 8]
+    offMonths: [12, 1, 2]
+  doghouse:
+    minPerMonth: 2
+    maxPerMonth: 5
+    peakMonths: [9, 10, 11]
+    offMonths: [6, 7, 8]
+  cathouse:
+    minPerMonth: 2
+    maxPerMonth: 4
+    peakMonths: []
+    offMonths: []
+
+businessRules:
+  workDays: [MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY]
+  preferMondayStarts: true
+  avoidHolidays: true
+  maxConcurrentProjects: 15
+  resourceUtilization: 0.75

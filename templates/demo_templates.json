@@ -1,0 +1,205 @@
+{
+  "version" : "1.0",
+  "created" : [ 2025, 8, 11, 8, 10, 48, 6770289 ],
+  "sourceDatabase" : "/home/m/.SimpleProjectResourceManager/scheduler.db",
+  "templates" : [ {
+    "type" : "general",
+    "baseProjectId" : "GRDN-2025-001",
+    "baseDescription" : "Garden Build - Nashville TN",
+    "baseDuration" : 5,
+    "resourceCount" : 0,
+    "resourcePatterns" : [ ],
+    "taskPatterns" : [ {
+      "name" : "Client Garden Plan",
+      "description" : null,
+      "sequence" : 1,
+      "estimatedHours" : null
+    }, {
+      "name" : "Prepare Property",
+      "description" : null,
+      "sequence" : 2,
+      "estimatedHours" : null
+    }, {
+      "name" : "Plant",
+      "description" : null,
+      "sequence" : 3,
+      "estimatedHours" : null
+    }, {
+      "name" : "Drip Irrigation",
+      "description" : null,
+      "sequence" : 4,
+      "estimatedHours" : null
+    }, {
+      "name" : "Mulch",
+      "description" : null,
+      "sequence" : 5,
+      "estimatedHours" : null
+    }, {
+      "name" : "Train Client",
+      "description" : null,
+      "sequence" : 6,
+      "estimatedHours" : null
+    }, {
+      "name" : "Cleanup",
+      "description" : null,
+      "sequence" : 7,
+      "estimatedHours" : null
+    }, {
+      "name" : "Clear and Level",
+      "description" : null,
+      "sequence" : 8,
+      "estimatedHours" : null
+    }, {
+      "name" : "Till",
+      "description" : null,
+      "sequence" : 9,
+      "estimatedHours" : null
+    } ],
+    "variationRules" : {
+      "minDuration" : 1,
+      "maxDuration" : 5,
+      "minResources" : 1,
+      "maxResources" : 3,
+      "seasonalPreference" : "year_round",
+      "requiresTeamRotation" : false
+    }
+  }, {
+    "type" : "doghouse",
+    "baseProjectId" : "DH-PBLD-2025-001",
+    "baseDescription" : "Dog House Prebuild, Council Bluffs IA",
+    "baseDuration" : 4,
+    "resourceCount" : 0,
+    "resourcePatterns" : [ ],
+    "taskPatterns" : [ {
+      "name" : "Frame",
+      "description" : null,
+      "sequence" : 1,
+      "estimatedHours" : null
+    }, {
+      "name" : "Install HVAC",
+      "description" : null,
+      "sequence" : 2,
+      "estimatedHours" : null
+    }, {
+      "name" : "Disassemble and Palletize",
+      "description" : null,
+      "sequence" : 3,
+      "estimatedHours" : null
+    }, {
+      "name" : "Ship to site",
+      "description" : null,
+      "sequence" : 4,
+      "estimatedHours" : null
+    }, {
+      "name" : "Roof",
+      "description" : null,
+      "sequence" : 5,
+      "estimatedHours" : null
+    }, {
+      "name" : "Side",
+      "description" : null,
+      "sequence" : 6,
+      "estimatedHours" : null
+    } ],
+    "variationRules" : {
+      "minDuration" : 3,
+      "maxDuration" : 4,
+      "minResources" : 2,
+      "maxResources" : 5,
+      "seasonalPreference" : "fall",
+      "requiresTeamRotation" : true
+    }
+  }, {
+    "type" : "doghouse",
+    "baseProjectId" : "DH-INST-2025-001",
+    "baseDescription" : "Dog House Installation - Council Bluffs IA",
+    "baseDuration" : 4,
+    "resourceCount" : 0,
+    "resourcePatterns" : [ ],
+    "taskPatterns" : [ {
+      "name" : "Prepare Foundation",
+      "description" : null,
+      "sequence" : 1,
+      "estimatedHours" : null
+    }, {
+      "name" : "Reassemble Dog House",
+      "description" : null,
+      "sequence" : 2,
+      "estimatedHours" : null
+    }, {
+      "name" : "Run AC to HVAC",
+      "description" : null,
+      "sequence" : 3,
+      "estimatedHours" : null
+    }, {
+      "name" : "Build front stoop",
+      "description" : null,
+      "sequence" : 4,
+      "estimatedHours" : null
+    }, {
+      "name" : "Power Test",
+      "description" : null,
+      "sequence" : 5,
+      "estimatedHours" : null
+    }, {
+      "name" : "Cleanup",
+      "description" : null,
+      "sequence" : 6,
+      "estimatedHours" : null
+    } ],
+    "variationRules" : {
+      "minDuration" : 3,
+      "maxDuration" : 4,
+      "minResources" : 2,
+      "maxResources" : 5,
+      "seasonalPreference" : "fall",
+      "requiresTeamRotation" : true
+    }
+  }, {
+    "type" : "general",
+    "baseProjectId" : "CH-PBLD-2025-001",
+    "baseDescription" : "Cat House Prebuild - Liincoln NE",
+    "baseDuration" : 4,
+    "resourceCount" : 0,
+    "resourcePatterns" : [ ],
+    "taskPatterns" : [ {
+      "name" : "Frame",
+      "description" : null,
+      "sequence" : 1,
+      "estimatedHours" : null
+    }, {
+      "name" : "Install HVAC",
+      "description" : null,
+      "sequence" : 2,
+      "estimatedHours" : null
+    }, {
+      "name" : "Disassemble  and Palletize",
+      "description" : null,
+      "sequence" : 3,
+      "estimatedHours" : null
+    }, {
+      "name" : "Ship to site",
+      "description" : null,
+      "sequence" : 4,
+      "estimatedHours" : null
+    }, {
+      "name" : "Roof",
+      "description" : null,
+      "sequence" : 5,
+      "estimatedHours" : null
+    }, {
+      "name" : "Side",
+      "description" : null,
+      "sequence" : 6,
+      "estimatedHours" : null
+    } ],
+    "variationRules" : {
+      "minDuration" : 1,
+      "maxDuration" : 5,
+      "minResources" : 1,
+      "maxResources" : 3,
+      "seasonalPreference" : "year_round",
+      "requiresTeamRotation" : false
+    }
+  } ]
+}

@@ -1,0 +1,430 @@
+/* Simple Project Resource Manager Styles */
+
+/* Toolbar Settings */
+.tool-bar {
+    -fx-min-height: 50px !important;
+    -fx-pref-height: 50px !important;
+    -fx-padding: 5 !important;
+}
+
+/* Toolbar Button Defaults */
+.tool-bar .button {
+    -fx-min-width: 80px !important;
+    -fx-min-height: 36px !important;
+    -fx-pref-height: 36px !important;
+    -fx-padding: 10 15 10 15 !important;
+    -fx-font-size: 13px !important;
+    -fx-font-weight: normal;
+    -fx-alignment: center !important;
+}
+
+/* Executive Command Button */
+.btn-executive {
+    -fx-background-color: linear-gradient(to bottom, #667eea, #764ba2);
+    -fx-text-fill: white !important;
+    -fx-font-weight: bold;
+    -fx-font-size: 14px !important;
+    -fx-min-width: 200px !important;
+    -fx-min-height: 32px !important;
+    -fx-padding: 8 20 8 20 !important;
+    -fx-background-radius: 5;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.15), 5, 0, 0, 1);
+}
+
+.btn-executive:hover {
+    -fx-background-color: linear-gradient(to bottom, #764ba2, #667eea);
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.25), 8, 0, 0, 2);
+}
+
+/* Root Variables */
+.root {
+    -fx-font-family: "Segoe UI", "Arial", sans-serif;
+    -fx-font-size: 12px;
+    
+    /* Color Palette */
+    -primary-color: #007bff;
+    -secondary-color: #6c757d;
+    -success-color: #28a745;
+    -danger-color: #dc3545;
+    -warning-color: #ffc107;
+    -info-color: #17a2b8;
+    -light-color: #f8f9fa;
+    -dark-color: #343a40;
+    
+    /* Background Colors */
+    -bg-primary: #ffffff;
+    -bg-secondary: #f8f9fa;
+    -bg-light-gray: #e9ecef;
+    
+    /* Border Colors */
+    -border-color: #dee2e6;
+    -border-light: #f1f3f4;
+}
+
+/* Main Layout */
+.main-border-pane {
+    -fx-background-color: -bg-primary;
+}
+
+/* Menu Bar Styling */
+.menu-bar {
+    -fx-background-color: -bg-secondary;
+    -fx-border-color: -border-color;
+    -fx-border-width: 0 0 1 0;
+}
+
+.menu-bar .menu-button {
+    -fx-background-color: transparent;
+    -fx-padding: 5 10 5 10;
+}
+
+.menu-bar .menu-button:hover {
+    -fx-background-color: -bg-light-gray;
+}
+
+/* Tool Bar Styling */
+.tool-bar {
+    -fx-background-color: -bg-secondary;
+    -fx-border-color: -border-color;
+    -fx-border-width: 0 0 1 0;
+    -fx-spacing: 5;
+    -fx-padding: 5 10 5 10;
+}
+
+.tool-bar .button {
+    -fx-min-width: 35;
+    -fx-min-height: 30;
+    -fx-pref-width: 35;
+    -fx-pref-height: 30;
+    -fx-background-radius: 4;
+    -fx-border-radius: 4;
+}
+
+.tool-bar .button:hover {
+    -fx-background-color: -bg-light-gray;
+}
+
+/* Navigation Buttons */
+.navigation-button {
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+}
+
+/* Filter Panel Styling */
+.filter-panel {
+    -fx-background-color: -bg-secondary;
+    -fx-border-color: -border-color;
+    -fx-border-width: 0 1 0 0;
+}
+
+.filter-panel .label {
+    -fx-font-weight: bold;
+}
+
+.filter-panel .combo-box {
+    -fx-background-color: white;
+}
+
+/* Timeline Container */
+.timeline-container {
+    -fx-background-color: -bg-primary;
+}
+
+.timeline-header {
+    -fx-background-color: -bg-light-gray;
+    -fx-border-color: -border-color;
+    -fx-border-width: 0 0 1 0;
+}
+
+/* Table Styling */
+.table-view {
+    -fx-background-color: -bg-primary;
+    -fx-border-color: transparent;
+}
+
+.table-view .column-header-background {
+    -fx-background-color: -bg-secondary;
+    -fx-border-color: -border-color;
+    -fx-border-width: 0 0 1 0;
+}
+
+.table-view .column-header {
+    -fx-background-color: transparent;
+    -fx-font-weight: bold;
+    -fx-border-color: -border-color;
+    -fx-border-width: 0 1 0 0;
+    -fx-padding: 8 10 8 10;
+}
+
+.table-view .table-row-cell {
+    -fx-border-color: -border-light;
+    -fx-border-width: 0 0 1 0;
+}
+
+.table-view .table-row-cell:selected {
+    -fx-background-color: #cce5ff;
+}
+
+.table-view .table-row-cell:hover {
+    -fx-background-color: -bg-light-gray;
+}
+
+/* Status Bar */
+.status-bar {
+    -fx-background-color: -bg-secondary;
+    -fx-border-color: -border-color;
+    -fx-border-width: 1 0 0 0;
+}
+
+.status-bar .label {
+    -fx-font-size: 11px;
+}
+
+/* Button Variants */
+.btn-primary {
+    -fx-background-color: -primary-color;
+    -fx-text-fill: white;
+    -fx-background-radius: 4;
+    -fx-border-radius: 4;
+    -fx-padding: 6 12 6 12;
+    -fx-min-width: 80;
+}
+
+.btn-primary:hover {
+    -fx-background-color: derive(-primary-color, -10%);
+}
+
+.btn-success {
+    -fx-background-color: -success-color;
+    -fx-text-fill: white;
+    -fx-background-radius: 4;
+    -fx-border-radius: 4;
+    -fx-padding: 6 12 6 12;
+    -fx-min-width: 80;
+}
+
+.btn-success:hover {
+    -fx-background-color: derive(-success-color, -10%);
+}
+
+.btn-warning {
+    -fx-background-color: -warning-color;
+    -fx-text-fill: -dark-color;
+    -fx-background-radius: 4;
+    -fx-border-radius: 4;
+    -fx-padding: 6 12 6 12;
+    -fx-min-width: 80;
+}
+
+.btn-warning:hover {
+    -fx-background-color: derive(-warning-color, -10%);
+}
+
+.btn-danger {
+    -fx-background-color: -danger-color;
+    -fx-text-fill: white;
+    -fx-background-radius: 4;
+    -fx-border-radius: 4;
+    -fx-padding: 6 12 6 12;
+    -fx-min-width: 80;
+}
+
+.btn-danger:hover {
+    -fx-background-color: derive(-danger-color, -10%);
+}
+
+.btn-info {
+    -fx-background-color: -info-color;
+    -fx-text-fill: white;
+    -fx-background-radius: 4;
+    -fx-border-radius: 4;
+    -fx-padding: 6 12 6 12;
+    -fx-min-width: 80;
+}
+
+.btn-info:hover {
+    -fx-background-color: derive(-info-color, -10%);
+}
+
+/* Typography Classes */
+.h1 { -fx-font-size: 32px; -fx-font-weight: bold; }
+.h2 { -fx-font-size: 24px; -fx-font-weight: bold; }
+.h3 { -fx-font-size: 20px; -fx-font-weight: bold; }
+.h4 { -fx-font-size: 16px; -fx-font-weight: bold; }
+.h5 { -fx-font-size: 14px; -fx-font-weight: bold; }
+.h6 { -fx-font-size: 12px; -fx-font-weight: bold; }
+
+.text-muted {
+    -fx-text-fill: -secondary-color;
+}
+
+.text-primary { -fx-text-fill: -primary-color; }
+.text-success { -fx-text-fill: -success-color; }
+.text-warning { -fx-text-fill: -warning-color; }
+.text-danger { -fx-text-fill: -danger-color; }
+.text-info { -fx-text-fill: -info-color; }
+
+/* Form Controls */
+.combo-box {
+    -fx-background-color: white;
+    -fx-border-color: -border-color;
+    -fx-border-radius: 4;
+    -fx-background-radius: 4;
+    -fx-padding: 5;
+}
+
+.date-picker {
+    -fx-background-color: white;
+    -fx-border-color: -border-color;
+    -fx-border-radius: 4;
+    -fx-background-radius: 4;
+}
+
+/* Project Status Colors */
+.status-active {
+    -fx-background-color: -success-color;
+    -fx-text-fill: white;
+    -fx-background-radius: 12;
+    -fx-padding: 2 8 2 8;
+}
+
+.status-completed {
+    -fx-background-color: -primary-color;
+    -fx-text-fill: white;
+    -fx-background-radius: 12;
+    -fx-padding: 2 8 2 8;
+}
+
+.status-delayed {
+    -fx-background-color: -warning-color;
+    -fx-text-fill: -dark-color;
+    -fx-background-radius: 12;
+    -fx-padding: 2 8 2 8;
+}
+
+.status-cancelled {
+    -fx-background-color: -danger-color;
+    -fx-text-fill: white;
+    -fx-background-radius: 12;
+    -fx-padding: 2 8 2 8;
+}
+
+/* Timeline Specific Styles */
+.timeline-view {
+    -fx-background-color: -bg-primary;
+    -fx-spacing: 0;
+}
+
+.timeline-header-row {
+    -fx-background-color: -bg-secondary;
+    -fx-border-color: -border-color;
+    -fx-border-width: 0 0 1 0;
+    -fx-min-height: 60;
+    -fx-max-height: 60;
+    -fx-spacing: 0;
+}
+
+.timeline-container {
+    -fx-background-color: -bg-primary;
+    -fx-spacing: 0;
+}
+
+.timeline-grid {
+    -fx-background-color: -bg-primary;
+    -fx-hgap: 0;
+    -fx-vgap: 0;
+    -fx-grid-lines-visible: true;
+    -fx-border-color: #333333;
+    -fx-border-width: 1;
+}
+
+.timeline-gridlines {
+    -fx-background-color: transparent;
+}
+
+.timeline-gridline {
+    -fx-stroke: #555555;  /* Dark gray - highly visible */
+    -fx-stroke-width: 1.0;
+}
+
+.timeline-scroll-pane {
+    -fx-background-color: -bg-primary;
+    -fx-fit-to-width: false;
+}
+
+.timeline-date-cell {
+    -fx-border-color: -border-light;
+    -fx-border-width: 0 1 0 0;
+    -fx-alignment: center;
+    -fx-padding: 8;
+    -fx-font-size: 11px;
+    -fx-text-alignment: center;
+    -fx-min-height: 60;
+    -fx-max-height: 60;
+}
+
+.resource-label {
+    -fx-border-color: -border-light;
+    -fx-border-width: 0 1 1 0;
+    -fx-alignment: center-left;
+    -fx-padding: 8 15 8 15;
+    -fx-font-weight: bold;
+    -fx-font-size: 12px;
+    -fx-min-height: 60;
+    -fx-max-height: 60;
+}
+
+.project-bar {
+    -fx-background-color: -primary-color;
+    -fx-background-radius: 4;
+    -fx-text-fill: white;
+    -fx-padding: 4 8 4 8;
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.2), 2, 0.0, 0, 1);
+    -fx-cursor: hand;
+}
+
+.project-bar:hover {
+    -fx-background-color: derive(-primary-color, -15%);
+}
+
+.assignment-bar {
+    -fx-background-color: -info-color;
+    -fx-background-radius: 4;
+    -fx-text-fill: white;
+    -fx-padding: 4 10 4 10;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.1), 1, 0.0, 0, 1);
+    -fx-cursor: hand;
+}
+
+.assignment-bar:hover {
+    -fx-background-color: derive(-info-color, -10%);
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.3), 2, 0.0, 0, 1);
+}
+
+.conflict-indicator {
+    -fx-background-color: -danger-color;
+    -fx-effect: dropshadow(three-pass-box, rgba(220,53,69,0.5), 4, 0.0, 0, 0);
+    -fx-border-color: -danger-color;
+    -fx-border-width: 2;
+}
+
+/* Scrollbars */
+.scroll-bar {
+    -fx-background-color: transparent;
+}
+
+.scroll-bar .thumb {
+    -fx-background-color: -secondary-color;
+    -fx-background-radius: 10;
+}
+
+.scroll-bar .thumb:hover {
+    -fx-background-color: derive(-secondary-color, -20%);
+}
+
+.scroll-bar .track {
+    -fx-background-color: transparent;
+}
