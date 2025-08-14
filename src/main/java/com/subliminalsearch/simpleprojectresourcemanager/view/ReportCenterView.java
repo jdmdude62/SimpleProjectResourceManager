@@ -807,7 +807,7 @@ public class ReportCenterView extends Stage {
             pageControls.getChildren().addAll(prevButton, pageLabel, nextButton);
             
             container.getChildren().clear();
-            container.getChildren().addAll(titleLabel, imageView, pageControls);
+            container.getChildren().addAll(titleLabel, pageControls, imageView);
             
         } catch (IOException e) {
             logger.error("Failed to display preview page", e);

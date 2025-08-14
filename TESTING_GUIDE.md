@@ -1,0 +1,322 @@
+# Testing Guide - Simple Project Resource Manager
+
+## Quick Start
+
+### Running All Tests
+```bash
+# Windows
+run-tests.bat
+
+# Or using Maven directly
+mvn clean test
+```
+
+### Running Specific Test Categories
+```bash
+# Run only unit tests
+mvn test -Dtest="*Test"
+
+# Run only regression tests
+mvn test -Dtest="*RegressionTest"
+
+# Run only financial tests
+mvn test -Dtest="FinancialServiceTest"
+
+# Run tests with coverage report
+mvn clean test jacoco:report
+```
+
+## Test Structure
+
+### Test Organization
+```
+src/test/java/com/subliminalsearch/simpleprojectresourcemanager/
+├── service/          # Business logic tests
+│   ├── FinancialServiceTest.java
+│   ├── SchedulingServiceTest.java
+│   └── ProjectServiceTest.java
+├── repository/       # Data access tests
+│   ├── AssignmentRepositoryTest.java
+│   ├── ProjectRepositoryTest.java
+│   └── ResourceRepositoryTest.java
+├── regression/       # Bug regression tests
+│   └── DateFormatRegressionTest.java
+└── integration/      # End-to-end tests
+    └── WorkflowIntegrationTest.java
+```
+
+## Test Categories
+
+### 1. Unit Tests
+Located in `service/` and `repository/` packages
+- Test individual components in isolation
+- Use mocks for dependencies
+- Fast execution (< 100ms per test)
+- Run with every build
+
+### 2. Regression Tests
+Located in `regression/` package
+- Prevent previously fixed bugs from reoccurring
+- Test specific bug scenarios
+- Include bug ticket numbers in test names
+
+### 3. Integration Tests
+Located in `integration/` package
+- Test complete workflows
+- Use real database (in-memory SQLite)
+- Test component interactions
+
+## Writing Tests
+
+### Test Naming Convention
+```java
+@Test
+@DisplayName("Should [expected behavior] when [condition]")
+void shouldDoSomethingWhenCondition() {
+    // Test implementation
+}
+```
+
+### BDD Style Tests
+```java
+@Test
+@DisplayName("SCENARIO: Purchase order workflow")
+void purchaseOrderWorkflow() {
+    // GIVEN - Initial state
+    PurchaseOrder po = createDraftPO();
+    
+    // WHEN - Action performed
+    service.submitForApproval(po);
+    
+    // THEN - Expected outcome
+    assertThat(po.getStatus()).isEqualTo(Status.PENDING);
+}
+```
+
+### Using Nested Test Classes
+```java
+@Nested
+@DisplayName("Feature: Budget Management")
+class BudgetManagementTests {
+    
+    @Test
+    @DisplayName("Should calculate variance correctly")
+    void shouldCalculateVariance() {
+        // Test implementation
+    }
+}
+```
+
+## Test Data Management
+
+### Test Data Builders
+```java
+// Use builder pattern for test data
+Project project = Project.builder()
+    .name("Test Project")
+    .budget(new BigDecimal("100000"))
+    .startDate(LocalDate.now())
+    .build();
+```
+
+### In-Memory Database
+```java
+@BeforeEach
+void setUp() {
+    // Use in-memory SQLite for tests
+    connection = DriverManager.getConnection("jdbc:sqlite::memory:");
+    repository.setConnection(connection);
+}
+```
+
+## Coverage Goals
+
+### Target Coverage Levels
+- **Overall:** 80% line coverage
+- **Service Layer:** 90% coverage (critical business logic)
+- **Repository Layer:** 85% coverage
+- **Controllers:** 70% coverage (UI logic)
+
+### Checking Coverage
+```bash
+# Generate coverage report
+mvn clean test jacoco:report
+
+# View report
+# Open: target/site/jacoco/index.html
+```
+
+## Running Tests in CI/CD
+
+### Maven Commands
+```bash
+# Clean build and test
+mvn clean test
+
+# Test with specific profile
+mvn test -P integration-tests
+
+# Skip tests during build
+mvn clean package -DskipTests
+
+# Run specific test class
+mvn test -Dtest=FinancialServiceTest
+
+# Run specific test method
+mvn test -Dtest=FinancialServiceTest#shouldCreatePurchaseOrder
+```
+
+### Jenkins Pipeline Example
+```groovy
+pipeline {
+    agent any
+    stages {
+        stage('Test') {
+            steps {
+                sh 'mvn clean test'
+            }
+            post {
+                always {
+                    junit 'target/surefire-reports/*.xml'
+                    publishHTML([
+                        reportDir: 'target/site/jacoco',
+                        reportFiles: 'index.html',
+                        reportName: 'Coverage Report'
+                    ])
+                }
+            }
+        }
+    }
+}
+```
+
+## Debugging Tests
+
+### Running Tests in IDE
+1. **IntelliJ IDEA:**
+   - Right-click test class/method → Run
+   - Use Debug mode for breakpoints
+   - View coverage with "Run with Coverage"
+
+2. **VS Code:**
+   - Install Java Test Runner extension
+   - Click play button next to test
+   - Use F5 for debug mode
+
+### Verbose Output
+```bash
+# Enable detailed test output
+mvn test -X
+
+# Show test execution details
+mvn test -Dsurefire.useFile=false
+```
+
+## Test Reports
+
+### Surefire Reports
+- Location: `target/surefire-reports/`
+- Contains: XML and TXT test results
+- Use for CI/CD integration
+
+### JaCoCo Coverage Reports
+- Location: `target/site/jacoco/`
+- Contains: HTML coverage reports
+- Shows line, branch, and method coverage
+
+### Custom HTML Reports
+- Generated by `run-tests.bat`
+- Location: `test-reports/[timestamp]/`
+- Includes formatted results and coverage
+
+## Common Testing Patterns
+
+### Testing Exceptions
+```java
+@Test
+void shouldThrowExceptionForInvalidState() {
+    assertThatThrownBy(() -> service.performAction())
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessage("Expected error message");
+}
+```
+
+### Testing Async Operations
+```java
+@Test
+void shouldCompleteAsyncOperation() {
+    CompletableFuture<Result> future = service.asyncOperation();
+    
+    assertThat(future)
+        .succeedsWithin(Duration.ofSeconds(5))
+        .satisfies(result -> {
+            assertThat(result.getValue()).isEqualTo(expected);
+        });
+}
+```
+
+### Testing with Dates
+```java
+@Test
+void shouldHandleDateCalculations() {
+    // Use fixed clock for predictable tests
+    Clock fixedClock = Clock.fixed(
+        Instant.parse("2025-08-14T10:00:00Z"),
+        ZoneOffset.UTC
+    );
+    service.setClock(fixedClock);
+    
+    LocalDate result = service.calculateDate();
+    assertThat(result).isEqualTo(LocalDate.of(2025, 8, 14));
+}
+```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Tests fail on Windows but pass on Linux:**
+   - Check file path separators
+   - Use `File.separator` instead of hardcoded "/"
+
+2. **Database lock errors:**
+   - Ensure connections are closed in `@AfterEach`
+   - Use try-with-resources for connections
+
+3. **Flaky tests:**
+   - Avoid `Thread.sleep()`
+   - Use proper synchronization
+   - Mock external dependencies
+
+4. **Out of memory errors:**
+   - Increase heap size: `mvn test -Xmx1024m`
+   - Clean up resources in `@AfterEach`
+
+## Best Practices
+
+1. **Keep tests independent** - Each test should be able to run alone
+2. **Use descriptive names** - Test names should explain what they test
+3. **Follow AAA pattern** - Arrange, Act, Assert
+4. **One assertion per test** - Or use soft assertions for related checks
+5. **Mock external dependencies** - Tests should be fast and reliable
+6. **Use test fixtures** - Reuse common test setup
+7. **Test edge cases** - Null values, empty collections, boundaries
+8. **Maintain tests** - Update tests when requirements change
+
+## Continuous Improvement
+
+### Adding New Tests
+When fixing bugs:
+1. Write a failing test that reproduces the bug
+2. Fix the bug
+3. Verify test passes
+4. Add to regression test suite
+
+### Reviewing Test Quality
+Regular review checklist:
+- [ ] Tests are readable and maintainable
+- [ ] Coverage targets are met
+- [ ] No duplicated test logic
+- [ ] Tests run quickly (< 5 minutes total)
+- [ ] Failure messages are helpful
+- [ ] Tests document expected behavior

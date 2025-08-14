@@ -28,6 +28,7 @@ public class AssignmentDialog extends Dialog<Assignment> {
     
     private final ComboBox<Project> projectCombo;
     private final ComboBox<Resource> resourceCombo;
+    private final ComboBox<ProjectManager> projectManagerCombo;
     private final DatePicker startDatePicker;
     private final DatePicker endDatePicker;
     private final Spinner<Integer> travelOutSpinner;
@@ -35,7 +36,6 @@ public class AssignmentDialog extends Dialog<Assignment> {
     private final CheckBox overrideCheckBox;
     private final TextField overrideReasonField;
     private final TextArea notesArea;
-    private final Label projectManagerLabel;
     private final Button editProjectButton;
     
     private final boolean isEditMode;
@@ -99,9 +99,16 @@ public class AssignmentDialog extends Dialog<Assignment> {
         notesArea.setPromptText("Assignment notes (optional)");
         notesArea.setPrefRowCount(2);
         
-        // Create project manager label
-        projectManagerLabel = new Label("(Select a project to see PM)");
-        projectManagerLabel.setStyle("-fx-text-fill: #666666; -fx-font-style: italic;");
+        // Create project manager combo box
+        projectManagerCombo = new ComboBox<>();
+        projectManagerCombo.setPromptText("Select a project manager");
+        projectManagerCombo.setConverter(createProjectManagerStringConverter());
+        
+        // Load project managers if scheduling service is available
+        if (schedulingService != null) {
+            List<ProjectManager> managers = schedulingService.getAllProjectManagers();
+            projectManagerCombo.setItems(FXCollections.observableArrayList(managers));
+        }
         
         // Create edit project button
         editProjectButton = new Button("Edit Client Info");
@@ -128,7 +135,7 @@ public class AssignmentDialog extends Dialog<Assignment> {
             }
         });
         
-        // Update date picker constraints and PM label based on project selection
+        // Update date picker constraints and PM combo based on project selection
         projectCombo.valueProperty().addListener((obs, oldVal, newVal) -> {
             if (newVal != null) {
                 if (existingAssignment == null) {
@@ -136,11 +143,10 @@ public class AssignmentDialog extends Dialog<Assignment> {
                     startDatePicker.setValue(newVal.getStartDate());
                     endDatePicker.setValue(newVal.getStartDate().plusDays(7));
                 }
-                updateProjectManagerLabel(newVal);
+                updateProjectManagerCombo(newVal);
                 editProjectButton.setDisable(false);
             } else {
-                projectManagerLabel.setText("(Select a project to see PM)");
-                projectManagerLabel.setStyle("-fx-text-fill: #666666; -fx-font-style: italic;");
+                projectManagerCombo.setValue(null);
                 editProjectButton.setDisable(true);
             }
         });
@@ -170,7 +176,7 @@ public class AssignmentDialog extends Dialog<Assignment> {
             
             if (selectedProject != null) {
                 projectCombo.setValue(selectedProject);
-                updateProjectManagerLabel(selectedProject);
+                updateProjectManagerCombo(selectedProject);
             }
             
             // Find and select resource
@@ -249,9 +255,10 @@ public class AssignmentDialog extends Dialog<Assignment> {
         GridPane.setHgrow(projectBox, Priority.ALWAYS);
         row++;
         
-        // Project Manager (display only)
+        // Project Manager
         grid.add(new Label("Project Manager:"), 0, row);
-        grid.add(projectManagerLabel, 1, row);
+        grid.add(projectManagerCombo, 1, row);
+        GridPane.setHgrow(projectManagerCombo, Priority.ALWAYS);
         row++;
         
         // Resource
@@ -414,6 +421,19 @@ public class AssignmentDialog extends Dialog<Assignment> {
                                                    overrideReasonField.getText().trim() : null);
                         assignment.setNotes(notesArea.getText().trim().isEmpty() ? 
                                           null : notesArea.getText().trim());
+                        
+                        // Update project's PM if changed
+                        if (projectManagerCombo.getValue() != null && projectCombo.getValue() != null) {
+                            Project project = projectCombo.getValue();
+                            project.setProjectManagerId(projectManagerCombo.getValue().getId());
+                            if (schedulingService != null) {
+                                try {
+                                    schedulingService.updateProject(project);
+                                } catch (Exception e) {
+                                    logger.error("Failed to update project manager", e);
+                                }
+                            }
+                        }
                     } else {
                         // Create new assignment
                         assignment = new Assignment(
@@ -560,10 +580,9 @@ public class AssignmentDialog extends Dialog<Assignment> {
         }
     }
     
-    private void updateProjectManagerLabel(Project project) {
+    private void updateProjectManagerCombo(Project project) {
         if (project == null || schedulingService == null) {
-            projectManagerLabel.setText("(No project selected)");
-            projectManagerLabel.setStyle("-fx-text-fill: #666666; -fx-font-style: italic;");
+            projectManagerCombo.setValue(null);
             return;
         }
         
@@ -574,18 +593,31 @@ public class AssignmentDialog extends Dialog<Assignment> {
                 .findFirst()
                 .orElse(null);
             
-            if (projectManager != null) {
-                projectManagerLabel.setText(projectManager.getName());
-                projectManagerLabel.setStyle("-fx-text-fill: #000000; -fx-font-weight: bold;");
-            } else {
-                projectManagerLabel.setText("Unassigned");
-                projectManagerLabel.setStyle("-fx-text-fill: #999999; -fx-font-style: italic;");
-            }
+            projectManagerCombo.setValue(projectManager);
         } catch (Exception e) {
             logger.warn("Could not load project manager for project: " + project.getProjectId(), e);
-            projectManagerLabel.setText("(Unable to load)");
-            projectManagerLabel.setStyle("-fx-text-fill: #cc0000; -fx-font-style: italic;");
+            projectManagerCombo.setValue(null);
         }
+    }
+    
+    private StringConverter<ProjectManager> createProjectManagerStringConverter() {
+        return new StringConverter<ProjectManager>() {
+            @Override
+            public String toString(ProjectManager pm) {
+                return pm != null ? pm.getName() : "";
+            }
+            
+            @Override
+            public ProjectManager fromString(String string) {
+                if (projectManagerCombo.getItems() == null) {
+                    return null;
+                }
+                return projectManagerCombo.getItems().stream()
+                    .filter(pm -> pm.getName().equals(string))
+                    .findFirst()
+                    .orElse(null);
+            }
+        };
     }
     
     private void updateResourceStyle() {

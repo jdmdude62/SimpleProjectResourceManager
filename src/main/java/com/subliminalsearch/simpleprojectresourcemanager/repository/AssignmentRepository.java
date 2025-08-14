@@ -34,8 +34,8 @@ public class AssignmentRepository implements BaseRepository<Assignment, Long> {
             
             stmt.setLong(1, assignment.getProjectId());
             stmt.setLong(2, assignment.getResourceId());
-            stmt.setDate(3, Date.valueOf(assignment.getStartDate()));
-            stmt.setDate(4, Date.valueOf(assignment.getEndDate()));
+            stmt.setString(3, assignment.getStartDate().toString() + " 00:00:00.000");
+            stmt.setString(4, assignment.getEndDate().toString() + " 00:00:00.000");
             stmt.setInt(5, assignment.getTravelOutDays());
             stmt.setInt(6, assignment.getTravelBackDays());
             stmt.setBoolean(7, assignment.isOverride());
@@ -85,8 +85,8 @@ public class AssignmentRepository implements BaseRepository<Assignment, Long> {
             
             stmt.setLong(1, assignment.getProjectId());
             stmt.setLong(2, assignment.getResourceId());
-            stmt.setDate(3, Date.valueOf(assignment.getStartDate()));
-            stmt.setDate(4, Date.valueOf(assignment.getEndDate()));
+            stmt.setString(3, assignment.getStartDate().toString() + " 00:00:00.000");
+            stmt.setString(4, assignment.getEndDate().toString() + " 00:00:00.000");
             stmt.setInt(5, assignment.getTravelOutDays());
             stmt.setInt(6, assignment.getTravelBackDays());
             stmt.setBoolean(7, assignment.isOverride());

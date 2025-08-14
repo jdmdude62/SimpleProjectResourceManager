@@ -118,6 +118,22 @@ public class CalendarMatrixView {
         resourceFilter = new ComboBox<>();
         resourceFilter.setPrefWidth(200);
         
+        // Set up converter to display resource name instead of toString
+        resourceFilter.setConverter(new javafx.util.StringConverter<Resource>() {
+            @Override
+            public String toString(Resource resource) {
+                return resource != null ? resource.getName() : "";
+            }
+            
+            @Override
+            public Resource fromString(String string) {
+                return resourceFilter.getItems().stream()
+                    .filter(r -> r != null && r.getName().equals(string))
+                    .findFirst()
+                    .orElse(null);
+            }
+        });
+        
         // Load resources
         List<Resource> resources = resourceRepository.findActiveResources();
         Resource allResources = new Resource();
