@@ -5,6 +5,10 @@ import com.subliminalsearch.simpleprojectresourcemanager.model.ProjectManager;
 import com.subliminalsearch.simpleprojectresourcemanager.model.ProjectStatus;
 import com.subliminalsearch.simpleprojectresourcemanager.repository.ProjectRepository;
 import com.subliminalsearch.simpleprojectresourcemanager.service.ProjectNumberGenerator;
+import com.subliminalsearch.simpleprojectresourcemanager.util.InputValidator;
+import com.subliminalsearch.simpleprojectresourcemanager.util.InputValidator.ValidationResult;
+import com.subliminalsearch.simpleprojectresourcemanager.util.InputValidator.ValidationType;
+import com.subliminalsearch.simpleprojectresourcemanager.util.PhoneFormatter;
 import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
 import javafx.scene.control.*;
@@ -17,6 +21,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -40,6 +45,12 @@ public class ProjectDialog extends Dialog<Project> {
     private final TextField contactRoleField;
     private final CheckBox sendReportsCheckBox;
     private final ComboBox<String> reportFrequencyCombo;
+    
+    // Validation error labels
+    private final Label projectIdErrorLabel;
+    private final Label emailErrorLabel;
+    private final Label phoneErrorLabel;
+    private final Label dateRangeErrorLabel;
     
     private final boolean isEditMode;
     private final Project existingProject;
@@ -124,7 +135,7 @@ public class ProjectDialog extends Dialog<Project> {
         contactEmailField.setPromptText("email1@example.com; email2@example.com");
         
         contactPhoneField = new TextField();
-        contactPhoneField.setPromptText("Phone number");
+        PhoneFormatter.applyPhoneFormat(contactPhoneField);
         
         contactCompanyField = new TextField();
         contactCompanyField.setPromptText("Company name");
@@ -139,6 +150,30 @@ public class ProjectDialog extends Dialog<Project> {
             "DAILY", "WEEKLY", "BIWEEKLY", "MONTHLY"
         ));
         reportFrequencyCombo.setValue("WEEKLY");
+        
+        // Initialize error labels
+        projectIdErrorLabel = new Label();
+        projectIdErrorLabel.setStyle("-fx-text-fill: #d32f2f; -fx-font-size: 11px;");
+        projectIdErrorLabel.setVisible(false);
+        projectIdErrorLabel.setManaged(false);
+        
+        emailErrorLabel = new Label();
+        emailErrorLabel.setStyle("-fx-text-fill: #d32f2f; -fx-font-size: 11px;");
+        emailErrorLabel.setVisible(false);
+        emailErrorLabel.setManaged(false);
+        
+        phoneErrorLabel = new Label();
+        phoneErrorLabel.setStyle("-fx-text-fill: #d32f2f; -fx-font-size: 11px;");
+        phoneErrorLabel.setVisible(false);
+        phoneErrorLabel.setManaged(false);
+        
+        dateRangeErrorLabel = new Label();
+        dateRangeErrorLabel.setStyle("-fx-text-fill: #d32f2f; -fx-font-size: 11px;");
+        dateRangeErrorLabel.setVisible(false);
+        dateRangeErrorLabel.setManaged(false);
+        
+        // Add real-time validation listeners
+        setupValidation();
         
         // Populate fields if editing
         if (isEditMode && existingProject != null) {
@@ -164,7 +199,7 @@ public class ProjectDialog extends Dialog<Project> {
                 contactEmailField.setText(existingProject.getContactEmail());
             }
             if (existingProject.getContactPhone() != null) {
-                contactPhoneField.setText(existingProject.getContactPhone());
+                PhoneFormatter.setPhoneNumber(contactPhoneField, existingProject.getContactPhone());
             }
             if (existingProject.getContactCompany() != null) {
                 contactCompanyField.setText(existingProject.getContactCompany());
@@ -210,6 +245,145 @@ public class ProjectDialog extends Dialog<Project> {
         getDialogPane().setPrefHeight(500);
     }
     
+    private void setupValidation() {
+        // Project ID validation
+        projectIdField.textProperty().addListener((obs, oldVal, newVal) -> {
+            if (!isEditMode && newVal != null && !newVal.trim().isEmpty()) {
+                ValidationResult result = InputValidator.validateProjectId(newVal);
+                updateFieldValidation(projectIdField, projectIdErrorLabel, result);
+            }
+        });
+        
+        // Email validation - allow multiple emails separated by semicolons
+        contactEmailField.textProperty().addListener((obs, oldVal, newVal) -> {
+            if (newVal != null && !newVal.trim().isEmpty()) {
+                String[] emails = newVal.split(";");
+                boolean allValid = true;
+                String errorMsg = null;
+                
+                for (String email : emails) {
+                    email = email.trim();
+                    if (!email.isEmpty()) {
+                        ValidationResult result = InputValidator.validateEmail(email);
+                        if (!result.isValid()) {
+                            allValid = false;
+                            errorMsg = result.getErrorMessage();
+                            break;
+                        }
+                    }
+                }
+                
+                ValidationResult finalResult = new ValidationResult(allValid, errorMsg);
+                updateFieldValidation(contactEmailField, emailErrorLabel, finalResult);
+            } else {
+                emailErrorLabel.setVisible(false);
+                emailErrorLabel.setManaged(false);
+                contactEmailField.setStyle("");
+            }
+        });
+        
+        // Phone validation - validate using unformatted phone
+        contactPhoneField.textProperty().addListener((obs, oldVal, newVal) -> {
+            if (newVal != null && !newVal.trim().isEmpty()) {
+                String unformattedPhone = PhoneFormatter.getUnformattedPhone(contactPhoneField);
+                ValidationResult result = InputValidator.validatePhone(unformattedPhone);
+                updateFieldValidation(contactPhoneField, phoneErrorLabel, result);
+            } else {
+                phoneErrorLabel.setVisible(false);
+                phoneErrorLabel.setManaged(false);
+                contactPhoneField.setStyle("");
+            }
+        });
+        
+        // Date range validation
+        Runnable validateDates = () -> {
+            ValidationResult result = InputValidator.validateDateRange(
+                startDatePicker.getValue(), 
+                endDatePicker.getValue()
+            );
+            updateDatePickerValidation(result);
+        };
+        
+        startDatePicker.valueProperty().addListener((obs, oldVal, newVal) -> validateDates.run());
+        endDatePicker.valueProperty().addListener((obs, oldVal, newVal) -> validateDates.run());
+        
+        // Add flexible date parsing
+        addFlexibleDateParser(startDatePicker);
+        addFlexibleDateParser(endDatePicker);
+    }
+    
+    private void updateFieldValidation(TextField field, Label errorLabel, ValidationResult result) {
+        if (!result.isValid() && result.getErrorMessage() != null) {
+            errorLabel.setText(result.getErrorMessage());
+            errorLabel.setVisible(true);
+            errorLabel.setManaged(true);
+            field.setStyle("-fx-border-color: #d32f2f; -fx-border-width: 1px;");
+        } else {
+            errorLabel.setVisible(false);
+            errorLabel.setManaged(false);
+            field.setStyle("");
+        }
+    }
+    
+    private void updateDatePickerValidation(ValidationResult result) {
+        if (!result.isValid() && result.getErrorMessage() != null) {
+            dateRangeErrorLabel.setText(result.getErrorMessage());
+            dateRangeErrorLabel.setVisible(true);
+            dateRangeErrorLabel.setManaged(true);
+            startDatePicker.setStyle("-fx-border-color: #d32f2f; -fx-border-width: 1px;");
+            endDatePicker.setStyle("-fx-border-color: #d32f2f; -fx-border-width: 1px;");
+        } else {
+            dateRangeErrorLabel.setVisible(false);
+            dateRangeErrorLabel.setManaged(false);
+            startDatePicker.setStyle("");
+            endDatePicker.setStyle("");
+        }
+    }
+    
+    private void addFlexibleDateParser(DatePicker picker) {
+        picker.getEditor().focusedProperty().addListener((obs, wasFocused, isNowFocused) -> {
+            if (!isNowFocused) {
+                String text = picker.getEditor().getText();
+                if (text != null && !text.trim().isEmpty()) {
+                    try {
+                        // Try to parse with multiple formats
+                        LocalDate date = parseFlexibleDate(text);
+                        if (date != null) {
+                            picker.setValue(date);
+                        }
+                    } catch (Exception e) {
+                        // Invalid date format - picker will handle it
+                    }
+                }
+            }
+        });
+    }
+    
+    private LocalDate parseFlexibleDate(String dateStr) {
+        if (dateStr == null || dateStr.trim().isEmpty()) {
+            return null;
+        }
+        
+        dateStr = dateStr.trim();
+        
+        // Common date formats to try
+        String[] patterns = {
+            "M/d/yyyy", "MM/dd/yyyy", "M-d-yyyy", "MM-dd-yyyy",
+            "yyyy-MM-dd", "yyyy/MM/dd", "d/M/yyyy", "dd/MM/yyyy"
+        };
+        
+        for (String pattern : patterns) {
+            try {
+                return LocalDate.parse(dateStr, 
+                    java.time.format.DateTimeFormatter.ofPattern(pattern));
+            } catch (Exception e) {
+                // Try next pattern
+            }
+        }
+        
+        return null;
+    }
+    
     private TabPane createTabbedLayout() {
         TabPane tabPane = new TabPane();
         tabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
@@ -236,11 +410,13 @@ public class ProjectDialog extends Dialog<Project> {
         
         // Project ID
         grid.add(new Label("Project ID:"), 0, row);
+        VBox projectIdContainer = new VBox(3);
         HBox projectIdBox = new HBox(5);
         projectIdBox.getChildren().addAll(projectIdField, generateButton);
         HBox.setHgrow(projectIdField, Priority.ALWAYS);
-        grid.add(projectIdBox, 1, row);
-        GridPane.setHgrow(projectIdBox, Priority.ALWAYS);
+        projectIdContainer.getChildren().addAll(projectIdBox, projectIdErrorLabel);
+        grid.add(projectIdContainer, 1, row);
+        GridPane.setHgrow(projectIdContainer, Priority.ALWAYS);
         row++;
         
         // Auto-generate checkbox (only for new projects)
@@ -267,7 +443,9 @@ public class ProjectDialog extends Dialog<Project> {
         
         // End Date
         grid.add(new Label("End Date:"), 0, row);
-        grid.add(endDatePicker, 1, row);
+        VBox endDateContainer = new VBox(3);
+        endDateContainer.getChildren().addAll(endDatePicker, dateRangeErrorLabel);
+        grid.add(endDateContainer, 1, row);
         row++;
         
         // Status
@@ -307,19 +485,23 @@ public class ProjectDialog extends Dialog<Project> {
         // Email (with note about multiple emails)
         grid.add(new Label("Email Address(es):"), 0, row);
         VBox emailBox = new VBox(5);
+        Label emailHint = new Label("Separate multiple emails with semicolons");
+        emailHint.setStyle("-fx-font-size: 10px; -fx-text-fill: gray;");
         emailBox.getChildren().addAll(
             contactEmailField,
-            new Label("Separate multiple emails with semicolons")
+            emailHint,
+            emailErrorLabel
         );
-        ((Label)emailBox.getChildren().get(1)).setStyle("-fx-font-size: 10px; -fx-text-fill: gray;");
         grid.add(emailBox, 1, row);
         GridPane.setHgrow(emailBox, Priority.ALWAYS);
         row++;
         
         // Phone
         grid.add(new Label("Phone:"), 0, row);
-        grid.add(contactPhoneField, 1, row);
-        GridPane.setHgrow(contactPhoneField, Priority.ALWAYS);
+        VBox phoneBox = new VBox(3);
+        phoneBox.getChildren().addAll(contactPhoneField, phoneErrorLabel);
+        grid.add(phoneBox, 1, row);
+        GridPane.setHgrow(phoneBox, Priority.ALWAYS);
         row++;
         
         // Separator
@@ -345,9 +527,18 @@ public class ProjectDialog extends Dialog<Project> {
     }
     
     private boolean isValidInput() {
-        // Project ID required (unless editing)
-        if (!isEditMode && (projectIdField.getText() == null || projectIdField.getText().trim().isEmpty())) {
-            return false;
+        boolean valid = true;
+        
+        // Project ID validation (unless editing)
+        if (!isEditMode) {
+            String projectId = projectIdField.getText();
+            if (projectId == null || projectId.trim().isEmpty()) {
+                return false;
+            }
+            ValidationResult projectIdResult = InputValidator.validateProjectId(projectId);
+            if (!projectIdResult.isValid()) {
+                return false;
+            }
         }
         
         // Description required
@@ -355,17 +546,44 @@ public class ProjectDialog extends Dialog<Project> {
             return false;
         }
         
-        // Dates required
+        // Date validation
         if (startDatePicker.getValue() == null || endDatePicker.getValue() == null) {
             return false;
         }
         
-        // Start date must be before or equal to end date
-        if (startDatePicker.getValue().isAfter(endDatePicker.getValue())) {
+        ValidationResult dateResult = InputValidator.validateDateRange(
+            startDatePicker.getValue(), 
+            endDatePicker.getValue()
+        );
+        if (!dateResult.isValid()) {
             return false;
         }
         
-        return true;
+        // Email validation (if provided)
+        String email = contactEmailField.getText();
+        if (email != null && !email.trim().isEmpty()) {
+            String[] emails = email.split(";");
+            for (String e : emails) {
+                e = e.trim();
+                if (!e.isEmpty()) {
+                    ValidationResult emailResult = InputValidator.validateEmail(e);
+                    if (!emailResult.isValid()) {
+                        return false;
+                    }
+                }
+            }
+        }
+        
+        // Phone validation (if provided)
+        String phone = PhoneFormatter.getUnformattedPhone(contactPhoneField);
+        if (phone != null && !phone.isEmpty()) {
+            ValidationResult phoneResult = InputValidator.validatePhone(phone);
+            if (!phoneResult.isValid()) {
+                return false;
+            }
+        }
+        
+        return valid;
     }
     
     private Callback<ButtonType, Project> createResultConverter() {
@@ -390,7 +608,7 @@ public class ProjectDialog extends Dialog<Project> {
                         // Update client contact information
                         project.setContactName(contactNameField.getText().trim());
                         project.setContactEmail(contactEmailField.getText().trim());
-                        project.setContactPhone(contactPhoneField.getText().trim());
+                        project.setContactPhone(PhoneFormatter.getUnformattedPhone(contactPhoneField));
                         project.setContactCompany(contactCompanyField.getText().trim());
                         project.setContactRole(contactRoleField.getText().trim());
                         project.setSendReports(sendReportsCheckBox.isSelected());
@@ -413,7 +631,7 @@ public class ProjectDialog extends Dialog<Project> {
                         // Set client contact information for new project
                         project.setContactName(contactNameField.getText().trim());
                         project.setContactEmail(contactEmailField.getText().trim());
-                        project.setContactPhone(contactPhoneField.getText().trim());
+                        project.setContactPhone(PhoneFormatter.getUnformattedPhone(contactPhoneField));
                         project.setContactCompany(contactCompanyField.getText().trim());
                         project.setContactRole(contactRoleField.getText().trim());
                         project.setSendReports(sendReportsCheckBox.isSelected());

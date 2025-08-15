@@ -40,6 +40,13 @@ public class ExecutiveCommandCenter {
     private VBox executiveScorecard;
     private VBox decisionQueue;
     private VBox alertsPanel;
+    private Label lastUpdateLabel;
+    
+    // Metric display labels that need updating
+    private Label activeProjectsLabel;
+    private Label resourceUtilizationLabel;
+    private Label conflictsLabel;
+    private Label decisionsLabel;
     
     // Metrics
     private int activeProjectsCount = 0;
@@ -150,10 +157,6 @@ public class ExecutiveCommandCenter {
         HBox.setHgrow(spacer, Priority.ALWAYS);
         
         // Quick actions
-        Button refreshBtn = new Button("🔄 Refresh");
-        refreshBtn.setStyle("-fx-background-color: white; -fx-text-fill: #2c3e50; -fx-font-weight: bold;");
-        refreshBtn.setOnAction(e -> refreshAllData());
-        
         Button exportBtn = new Button("📤 Export Report");
         exportBtn.setStyle("-fx-background-color: white; -fx-text-fill: #2c3e50; -fx-font-weight: bold;");
         exportBtn.setOnAction(e -> exportExecutiveReport());
@@ -161,7 +164,7 @@ public class ExecutiveCommandCenter {
         Button alertsBtn = new Button("🔔 Configure Alerts");
         alertsBtn.setStyle("-fx-background-color: white; -fx-text-fill: #2c3e50; -fx-font-weight: bold;");
         
-        header.getChildren().addAll(title, spacer, timeLabel, refreshBtn, exportBtn, alertsBtn);
+        header.getChildren().addAll(title, spacer, timeLabel, exportBtn, alertsBtn);
         return header;
     }
     
@@ -230,24 +233,28 @@ public class ExecutiveCommandCenter {
         grid.setPadding(new Insets(20));
         
         // Active Projects
-        VBox projectsBox = createMetricBox("📁", "Active Projects", String.valueOf(activeProjectsCount), 
+        activeProjectsLabel = new Label(String.valueOf(activeProjectsCount));
+        VBox projectsBox = createMetricBoxWithLabel("📁", "Active Projects", activeProjectsLabel, 
                                           "↑ 2 from last week", "#3498db");
         grid.add(projectsBox, 0, 0);
         
         // Resource Utilization
-        VBox utilizationBox = createMetricBox("👥", "Resource Utilization", 
-                                             String.format("%.1f%%", resourceUtilization),
+        resourceUtilizationLabel = new Label(String.format("%.1f%%", resourceUtilization));
+        VBox utilizationBox = createMetricBoxWithLabel("👥", "Resource Utilization", 
+                                             resourceUtilizationLabel,
                                              resourceUtilization > 90 ? "⚠️ High" : "✅ Optimal", "#9b59b6");
         grid.add(utilizationBox, 1, 0);
         
         // Conflicts
-        VBox conflictsBox = createMetricBox("⚡", "Active Conflicts", String.valueOf(resourceConflictsCount),
+        conflictsLabel = new Label(String.valueOf(resourceConflictsCount));
+        VBox conflictsBox = createMetricBoxWithLabel("⚡", "Active Conflicts", conflictsLabel,
                                            resourceConflictsCount > 0 ? "Needs resolution" : "All clear", 
                                            resourceConflictsCount > 0 ? "#e74c3c" : "#27ae60");
         grid.add(conflictsBox, 2, 0);
         
         // Decisions Needed
-        VBox decisionsBox = createMetricBox("🎯", "Decisions Needed", String.valueOf(decisionsNeededCount),
+        decisionsLabel = new Label(String.valueOf(decisionsNeededCount));
+        VBox decisionsBox = createMetricBoxWithLabel("🎯", "Decisions Needed", decisionsLabel,
                                            "Awaiting your input", "#f39c12");
         grid.add(decisionsBox, 3, 0);
         
@@ -265,6 +272,31 @@ public class ExecutiveCommandCenter {
         iconLabel.setFont(Font.font(32));
         
         Label valueLabel = new Label(value);
+        valueLabel.setFont(Font.font("System", FontWeight.BOLD, 28));
+        valueLabel.setTextFill(Color.web(color));
+        
+        Label nameLabel = new Label(label);
+        nameLabel.setFont(Font.font("System", FontWeight.BOLD, 12));
+        nameLabel.setTextFill(Color.web("#7f8c8d"));
+        
+        Label detailLabel = new Label(detail);
+        detailLabel.setFont(Font.font(10));
+        detailLabel.setTextFill(Color.web("#95a5a6"));
+        
+        box.getChildren().addAll(iconLabel, valueLabel, nameLabel, detailLabel);
+        return box;
+    }
+    
+    private VBox createMetricBoxWithLabel(String icon, String label, Label valueLabel, String detail, String color) {
+        VBox box = new VBox(5);
+        box.setPadding(new Insets(15));
+        box.setAlignment(Pos.CENTER);
+        box.setStyle("-fx-background-color: white; -fx-border-color: " + color + "; -fx-border-width: 2; -fx-border-radius: 10; -fx-background-radius: 10;");
+        box.setPrefWidth(200);
+        
+        Label iconLabel = new Label(icon);
+        iconLabel.setFont(Font.font(32));
+        
         valueLabel.setFont(Font.font("System", FontWeight.BOLD, 28));
         valueLabel.setTextFill(Color.web(color));
         
@@ -479,14 +511,20 @@ public class ExecutiveCommandCenter {
         LineChart<String, Number> lineChart = new LineChart<>(xAxis, yAxis);
         lineChart.setTitle("Project Completion Trend");
         lineChart.setLegendVisible(false);
+        lineChart.setCreateSymbols(false); // Disable symbols to avoid JavaFX compatibility issue
         
         XYChart.Series<String, Number> series = new XYChart.Series<>();
-        series.getData().add(new XYChart.Data<>("Jan", 8));
-        series.getData().add(new XYChart.Data<>("Feb", 10));
-        series.getData().add(new XYChart.Data<>("Mar", 9));
-        series.getData().add(new XYChart.Data<>("Apr", 12));
-        series.getData().add(new XYChart.Data<>("May", 11));
-        series.getData().add(new XYChart.Data<>("Jun", 14));
+        series.setName("Projects");
+        
+        // Add all data at once to avoid individual node creation
+        ObservableList<XYChart.Data<String, Number>> data = FXCollections.observableArrayList();
+        data.add(new XYChart.Data<>("Jan", 8));
+        data.add(new XYChart.Data<>("Feb", 10));
+        data.add(new XYChart.Data<>("Mar", 9));
+        data.add(new XYChart.Data<>("Apr", 12));
+        data.add(new XYChart.Data<>("May", 11));
+        data.add(new XYChart.Data<>("Jun", 14));
+        series.getData().addAll(data);
         
         lineChart.getData().add(series);
         return lineChart;
@@ -691,8 +729,14 @@ public class ExecutiveCommandCenter {
         Label statusLabel = new Label("System Status: Online");
         statusLabel.setTextFill(Color.WHITE);
         
-        Label lastRefresh = new Label("Last Refresh: " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")));
-        lastRefresh.setTextFill(Color.WHITE);
+        lastUpdateLabel = new Label("Last Updated: " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")));
+        lastUpdateLabel.setTextFill(Color.WHITE);
+        lastUpdateLabel.setFont(Font.font("System", FontWeight.BOLD, 12));
+        
+        // Add auto-refresh indicator
+        Label refreshIndicator = new Label("⟳ Auto-refresh: 30s");
+        refreshIndicator.setTextFill(Color.LIGHTGREEN);
+        refreshIndicator.setFont(Font.font("System", 11));
         
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
@@ -700,7 +744,7 @@ public class ExecutiveCommandCenter {
         Label userLabel = new Label("Executive View | Full Access");
         userLabel.setTextFill(Color.WHITE);
         
-        statusBar.getChildren().addAll(statusLabel, lastRefresh, spacer, userLabel);
+        statusBar.getChildren().addAll(statusLabel, lastUpdateLabel, refreshIndicator, spacer, userLabel);
         return statusBar;
     }
     
@@ -756,16 +800,11 @@ public class ExecutiveCommandCenter {
     
     private void refreshAllData() {
         loadMetrics();
-        // Refresh all views
-        morningDashboard.getChildren().clear();
-        morningDashboard = createMorningDashboard();
-        ((ScrollPane)mainTabPane.getTabs().get(0).getContent()).setContent(morningDashboard);
+        updateAllTabs();
+        updateStatusBar();
         
-        Alert alert = new Alert(Alert.AlertType.INFORMATION);
-        alert.setTitle("Data Refreshed");
-        alert.setHeaderText(null);
-        alert.setContentText("All dashboards have been updated with latest data.");
-        alert.showAndWait();
+        // Log refresh to console instead of showing alert
+        System.out.println("Dashboard refreshed at " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")));
     }
     
     private void exportExecutiveReport() {
@@ -778,13 +817,79 @@ public class ExecutiveCommandCenter {
     }
     
     private void startAutoRefresh() {
-        Timeline autoRefresh = new Timeline(new KeyFrame(Duration.minutes(5), e -> loadMetrics()));
+        // Refresh every 30 seconds for real-time updates
+        Timeline autoRefresh = new Timeline(new KeyFrame(Duration.seconds(30), e -> refreshAllData()));
         autoRefresh.setCycleCount(Animation.INDEFINITE);
         autoRefresh.play();
+        
+        // Store the timeline so we can stop it when the window closes
+        stage.setOnCloseRequest(event -> autoRefresh.stop());
+    }
+    
+    private void updateAllTabs() {
+        // Update Morning Dashboard if visible
+        if (morningDashboard != null) {
+            updateMorningDashboard();
+        }
+        
+        // Update Executive Scorecard if visible
+        if (executiveScorecard != null) {
+            updateExecutiveScorecard();
+        }
+        
+        // Update Decision Queue if visible
+        if (decisionQueue != null) {
+            updateDecisionQueue();
+        }
+        
+        // Update Predictive Alerts if visible
+        if (alertsPanel != null) {
+            updatePredictiveAlerts();
+        }
+    }
+    
+    private void updateMorningDashboard() {
+        // Update the metric labels with current values
+        if (activeProjectsLabel != null) {
+            activeProjectsLabel.setText(String.valueOf(activeProjectsCount));
+        }
+        if (resourceUtilizationLabel != null) {
+            resourceUtilizationLabel.setText(String.format("%.1f%%", resourceUtilization));
+        }
+        if (conflictsLabel != null) {
+            conflictsLabel.setText(String.valueOf(resourceConflictsCount));
+        }
+        if (decisionsLabel != null) {
+            decisionsLabel.setText(String.valueOf(decisionsNeededCount));
+        }
+    }
+    
+    private void updateExecutiveScorecard() {
+        // Refresh scorecard metrics
+        // Update charts and KPIs
+    }
+    
+    private void updateDecisionQueue() {
+        // Refresh decision items
+    }
+    
+    private void updatePredictiveAlerts() {
+        // Refresh alert predictions
+    }
+    
+    private void updateStatusBar() {
+        // Update the status bar with latest refresh time
+        if (lastUpdateLabel != null) {
+            lastUpdateLabel.setText("Last Updated: " + 
+                LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")));
+        }
     }
     
     public void show() {
         stage.show();
         stage.centerOnScreen();
+        
+        // Perform initial data refresh when dashboard opens
+        refreshAllData();
     }
 }

@@ -1,9 +1,12 @@
 package com.subliminalsearch.simpleprojectresourcemanager.component;
 
 import com.subliminalsearch.simpleprojectresourcemanager.model.Assignment;
+import com.subliminalsearch.simpleprojectresourcemanager.model.CompanyHoliday;
 import com.subliminalsearch.simpleprojectresourcemanager.model.Project;
 import com.subliminalsearch.simpleprojectresourcemanager.model.ProjectStatus;
 import com.subliminalsearch.simpleprojectresourcemanager.model.Resource;
+import com.subliminalsearch.simpleprojectresourcemanager.model.TechnicianUnavailability;
+import com.subliminalsearch.simpleprojectresourcemanager.model.UnavailabilityType;
 import com.subliminalsearch.simpleprojectresourcemanager.service.FinancialService;
 import com.subliminalsearch.simpleprojectresourcemanager.view.FinancialTrackingDialog;
 import javafx.application.Platform;
@@ -75,6 +78,8 @@ public class TimelineView extends VBox {
     private final ObservableList<Project> projects = FXCollections.observableArrayList();
     private final ObservableList<Resource> resources = FXCollections.observableArrayList();
     private final ObservableList<Assignment> assignments = FXCollections.observableArrayList();
+    private final ObservableList<TechnicianUnavailability> unavailabilities = FXCollections.observableArrayList();
+    private final ObservableList<CompanyHoliday> companyHolidays = FXCollections.observableArrayList();
     
     // Conflict detection
     private Set<Long> conflictedAssignmentIds = new HashSet<>();
@@ -103,6 +108,8 @@ public class TimelineView extends VBox {
     private Consumer<Project> onDeleteProject;
     private Consumer<Resource> onEditResource;
     private Consumer<Resource> onDeleteResource;
+    private Consumer<Resource> onMarkResourceUnavailable;
+    private Consumer<Resource> onViewResourceUnavailability;
     private Consumer<Assignment> onEditAssignment;
     private Consumer<Assignment> onDeleteAssignment;
     private Consumer<Assignment> onDuplicateAssignment;
@@ -319,8 +326,30 @@ public class TimelineView extends VBox {
             dateLabel.setMaxHeight(HEADER_HEIGHT);
             dateLabel.setAlignment(Pos.CENTER);
             
+            // Check if this is a weekend, holiday, or today
+            boolean isWeekend = date.getDayOfWeek() == java.time.DayOfWeek.SATURDAY || 
+                               date.getDayOfWeek() == java.time.DayOfWeek.SUNDAY;
+            boolean isHoliday = companyHolidays != null && companyHolidays.stream()
+                .anyMatch(h -> h.getDate().equals(date));
+            boolean isToday = date.equals(LocalDate.now());
+            
             // Add visible border for day separation and ensure full height
             String baseStyle = "-fx-border-color: #d0d0d0; -fx-border-width: 0 1 1 0; -fx-padding: 0;";
+            
+            // Apply background colors to match timeline
+            if (isToday) {
+                // Today gets black background with white bold text
+                baseStyle += " -fx-background-color: #000000; -fx-text-fill: white; -fx-font-weight: bold;";
+            } else if (isHoliday) {
+                // Light pastel pink/coral for holidays
+                baseStyle += " -fx-background-color: #ffe0e6;";
+            } else if (isWeekend) {
+                // Light pastel blue for weekends
+                baseStyle += " -fx-background-color: #e6f3ff;";
+            } else {
+                // Regular weekday background
+                baseStyle += " -fx-background-color: #f5f5f5;";
+            }
             
             // Format date display based on view mode and zoom level
             String displayText;
@@ -362,18 +391,6 @@ public class TimelineView extends VBox {
                     displayText = date.format(dayFormatter);
             }
             dateLabel.setText(displayText);
-            
-            // Highlight weekends
-            if (date.getDayOfWeek().getValue() >= 6) { // Saturday or Sunday
-                baseStyle += " -fx-background-color: #f0f0f0;";
-            } else {
-                baseStyle += " -fx-background-color: #f5f5f5;"; // Match resource header background
-            }
-            
-            // Highlight today
-            if (date.equals(LocalDate.now())) {
-                baseStyle += " -fx-background-color: #e3f2fd; -fx-font-weight: bold;";
-            }
             
             dateLabel.setStyle(baseStyle);
             headerRow.getChildren().add(dateLabel);
@@ -497,6 +514,17 @@ public class TimelineView extends VBox {
             })
             .toList();
         
+        // Get unavailabilities for this resource
+        List<TechnicianUnavailability> resourceUnavailabilities = unavailabilities.stream()
+            .filter(u -> u.getResourceId().equals(resource.getId()))
+            .filter(u -> {
+                // Check if unavailability overlaps with timeline range
+                LocalDate unavailStart = u.getStartDate();
+                LocalDate unavailEnd = u.getEndDate();
+                return !(unavailEnd.isBefore(start) || unavailStart.isAfter(end));
+            })
+            .toList();
+        
         // Create background for the entire row
         long dayCount = ChronoUnit.DAYS.between(start, end) + 1;
         HBox rowContainer = new HBox();
@@ -508,13 +536,19 @@ public class TimelineView extends VBox {
         // Make row container transparent so day cell borders show through
         rowContainer.setStyle("-fx-background-color: transparent;");
         
-        // Add assignment bars
+        // Add unavailability bars first (they appear behind assignments)
+        for (TechnicianUnavailability unavailability : resourceUnavailabilities) {
+            createUnavailabilityBar(unavailability, start, end, rowContainer, rowIndex);
+        }
+        
+        // Add assignment bars on top
         for (Assignment assignment : resourceAssignments) {
             createAssignmentBar(assignment, start, end, rowContainer, rowIndex);
         }
         
         // Add individual day cells with borders for grid visibility
         for (int dayIndex = 0; dayIndex < dayCount; dayIndex++) {
+            LocalDate cellDate = start.plusDays(dayIndex);
             Pane dayCell = new Pane();
             dayCell.setPrefWidth(dayWidth);
             dayCell.setMaxWidth(dayWidth);
@@ -523,9 +557,23 @@ public class TimelineView extends VBox {
             dayCell.setPrefHeight(rowHeight);
             dayCell.setMaxHeight(rowHeight);
             
-            // Build style with borders and alternating background
+            // Build style with borders and background based on day type
             String cellStyle = "-fx-border-color: #d0d0d0; -fx-border-width: 0 1 1 0;";
-            if (rowIndex % 2 == 0) {
+            
+            // Check if this is a weekend or holiday
+            boolean isWeekend = cellDate.getDayOfWeek() == java.time.DayOfWeek.SATURDAY || 
+                               cellDate.getDayOfWeek() == java.time.DayOfWeek.SUNDAY;
+            boolean isHoliday = companyHolidays != null && companyHolidays.stream()
+                .anyMatch(h -> h.getDate().equals(cellDate));
+            
+            if (isHoliday) {
+                // Light pastel pink/coral for holidays
+                cellStyle += " -fx-background-color: #ffe0e6;";
+            } else if (isWeekend) {
+                // Light pastel blue for weekends
+                cellStyle += " -fx-background-color: #e6f3ff;";
+            } else if (rowIndex % 2 == 0) {
+                // Regular alternating row color
                 cellStyle += " -fx-background-color: #f8f9fa;";
             } else {
                 cellStyle += " -fx-background-color: white;";
@@ -764,6 +812,122 @@ public class TimelineView extends VBox {
         rowContainer.getChildren().add(barContainer);
     }
     
+    private void createUnavailabilityBar(TechnicianUnavailability unavailability, LocalDate timelineStart, 
+                                        LocalDate timelineEnd, HBox rowContainer, int rowIndex) {
+        // Calculate unavailability bar positioning
+        LocalDate unavailStart = unavailability.getStartDate();
+        LocalDate unavailEnd = unavailability.getEndDate();
+        
+        // Clamp unavailability dates to timeline range
+        LocalDate barStart = unavailStart.isBefore(timelineStart) ? timelineStart : unavailStart;
+        LocalDate barEnd = unavailEnd.isAfter(timelineEnd) ? timelineEnd : unavailEnd;
+        
+        long startDayOffset = ChronoUnit.DAYS.between(timelineStart, barStart);
+        long barDuration = ChronoUnit.DAYS.between(barStart, barEnd) + 1;
+        
+        if (barDuration <= 0) {
+            return; // No visible portion
+        }
+        
+        // Create unavailability bar
+        Label unavailabilityBar = new Label();
+        unavailabilityBar.setPrefWidth(barDuration * dayWidth);
+        unavailabilityBar.setMaxWidth(barDuration * dayWidth);
+        unavailabilityBar.setMinWidth(barDuration * dayWidth);
+        unavailabilityBar.setPrefHeight(rowHeight - 4); // Full row height minus small margin
+        unavailabilityBar.setMaxHeight(rowHeight - 4);
+        unavailabilityBar.setMinHeight(rowHeight - 4);
+        
+        // Set text based on unavailability type
+        String typeText = unavailability.getType().getDisplayName();
+        String reasonText = unavailability.getReason() != null ? unavailability.getReason() : "";
+        String displayText = typeText;
+        if (!reasonText.isEmpty() && barDuration >= 3) { // Show reason if bar is wide enough
+            displayText = typeText + ": " + (reasonText.length() > 20 ? reasonText.substring(0, 17) + "..." : reasonText);
+        }
+        unavailabilityBar.setText(displayText);
+        unavailabilityBar.setAlignment(Pos.CENTER);
+        unavailabilityBar.setTextAlignment(TextAlignment.CENTER);
+        
+        // Style based on unavailability type with different patterns
+        String baseStyle = "-fx-font-size: " + (10 * zoomLevel) + "px; ";
+        String pattern = "";
+        String textColor = "white";
+        
+        switch (unavailability.getType()) {
+            case VACATION:
+                // Blue with diagonal stripes
+                pattern = "repeating-linear-gradient(45deg, #2196F3 0px, #2196F3 10px, #64B5F6 10px, #64B5F6 20px)";
+                break;
+            case SICK_LEAVE:
+                // Orange with horizontal stripes
+                pattern = "repeating-linear-gradient(0deg, #FF9800 0px, #FF9800 10px, #FFB74D 10px, #FFB74D 20px)";
+                break;
+            case TRAINING:
+                // Purple with vertical stripes
+                pattern = "repeating-linear-gradient(90deg, #9C27B0 0px, #9C27B0 10px, #BA68C8 10px, #BA68C8 20px)";
+                break;
+            case PERSONAL_TIME:
+                // Green with dots pattern
+                pattern = "radial-gradient(circle, #4CAF50 30%, #81C784 30%)";
+                break;
+            case OTHER_ASSIGNMENT:
+                // Brown with checkerboard
+                pattern = "repeating-conic-gradient(#795548 0% 25%, #A1887F 25% 50%)";
+                break;
+            case RECURRING:
+                // Gray diagonal stripes
+                pattern = "repeating-linear-gradient(-45deg, #757575 0px, #757575 10px, #BDBDBD 10px, #BDBDBD 20px)";
+                textColor = "black";
+                break;
+            case EMERGENCY:
+                // Red cross pattern
+                pattern = "repeating-linear-gradient(45deg, #F44336 0px, #F44336 5px, #EF9A9A 5px, #EF9A9A 10px)";
+                break;
+            default:
+                // Teal with dots
+                pattern = "repeating-radial-gradient(circle at 50% 50%, #009688 0px, #009688 5px, #4DB6AC 5px, #4DB6AC 10px)";
+                break;
+        }
+        
+        // Apply styling with opacity to show it's a background element
+        unavailabilityBar.setStyle(baseStyle + 
+            "-fx-background-color: " + pattern + "; " +
+            "-fx-text-fill: " + textColor + "; " +
+            "-fx-opacity: 0.7; " +
+            "-fx-border-color: #666666; " +
+            "-fx-border-width: 1; " +
+            "-fx-border-style: dashed; " +
+            "-fx-padding: 2;"
+        );
+        
+        // Add tooltip with unavailability details
+        StringBuilder tooltipBuilder = new StringBuilder();
+        tooltipBuilder.append("Unavailability: ").append(unavailability.getType().getDisplayName()).append("\n");
+        tooltipBuilder.append("Dates: ").append(
+            unavailability.getStartDate().format(DateTimeFormatter.ofPattern("MMM d, yyyy"))).append(" to ").append(
+            unavailability.getEndDate().format(DateTimeFormatter.ofPattern("MMM d, yyyy"))).append("\n");
+        if (unavailability.getReason() != null) {
+            tooltipBuilder.append("Reason: ").append(unavailability.getReason()).append("\n");
+        }
+        if (!unavailability.isApproved()) {
+            tooltipBuilder.append("Status: Pending Approval");
+        } else {
+            tooltipBuilder.append("Status: Approved");
+            if (unavailability.getApprovedBy() != null) {
+                tooltipBuilder.append(" by ").append(unavailability.getApprovedBy());
+            }
+        }
+        
+        Tooltip tooltip = new Tooltip(tooltipBuilder.toString());
+        unavailabilityBar.setTooltip(tooltip);
+        
+        // Set margin for positioning
+        HBox.setMargin(unavailabilityBar, new Insets(2, 0, 2, startDayOffset * dayWidth));
+        
+        rowContainer.getChildren().add(unavailabilityBar);
+    }
+    
     // Context menu methods
     private void showResourceContextMenu(Resource resource, Label resourceLabel, double screenX, double screenY) {
         ContextMenu contextMenu = new ContextMenu();
@@ -804,7 +968,33 @@ public class TimelineView extends VBox {
             }
         });
         
-        contextMenu.getItems().addAll(detailsItem, separator, editItem, deleteItem, new SeparatorMenuItem(), statusItem);
+        // Mark Unavailable menu item
+        MenuItem markUnavailableItem = new MenuItem("Mark Unavailable...");
+        markUnavailableItem.setOnAction(e -> {
+            if (onMarkResourceUnavailable != null) {
+                onMarkResourceUnavailable.accept(resource);
+            }
+        });
+        
+        // View Unavailability menu item
+        MenuItem viewUnavailabilityItem = new MenuItem("View Unavailability");
+        viewUnavailabilityItem.setOnAction(e -> {
+            if (onViewResourceUnavailability != null) {
+                onViewResourceUnavailability.accept(resource);
+            }
+        });
+        
+        contextMenu.getItems().addAll(
+            detailsItem, 
+            separator, 
+            editItem, 
+            deleteItem, 
+            new SeparatorMenuItem(), 
+            markUnavailableItem,
+            viewUnavailabilityItem,
+            new SeparatorMenuItem(),
+            statusItem
+        );
         contextMenu.show(resourceLabel, screenX, screenY);
     }
     
@@ -927,6 +1117,8 @@ public class TimelineView extends VBox {
     public ObservableList<Project> getProjects() { return projects; }
     public ObservableList<Resource> getResources() { return resources; }
     public ObservableList<Assignment> getAssignments() { return assignments; }
+    public ObservableList<TechnicianUnavailability> getUnavailabilities() { return unavailabilities; }
+    public ObservableList<CompanyHoliday> getCompanyHolidays() { return companyHolidays; }
     
     // Utility methods
     public void scrollToDate(LocalDate date) {
@@ -1067,6 +1259,14 @@ public class TimelineView extends VBox {
     
     public void setOnDeleteResource(Consumer<Resource> onDeleteResource) {
         this.onDeleteResource = onDeleteResource;
+    }
+    
+    public void setOnMarkResourceUnavailable(Consumer<Resource> onMarkResourceUnavailable) {
+        this.onMarkResourceUnavailable = onMarkResourceUnavailable;
+    }
+    
+    public void setOnViewResourceUnavailability(Consumer<Resource> onViewResourceUnavailability) {
+        this.onViewResourceUnavailability = onViewResourceUnavailability;
     }
     
     public void setOnEditAssignment(Consumer<Assignment> onEditAssignment) {

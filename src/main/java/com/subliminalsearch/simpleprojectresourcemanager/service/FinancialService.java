@@ -442,7 +442,7 @@ public class FinancialService {
     
     // Update project financials
     public void updateProjectFinancials(Project project) {
-        projectRepository.update(project);
+        projectRepository.updateFinancials(project);
     }
     
     // Mapping methods

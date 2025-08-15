@@ -7,16 +7,8 @@
     -fx-padding: 5 !important;
 }
 
-/* Toolbar Button Defaults */
-.tool-bar .button {
-    -fx-min-width: 80px !important;
-    -fx-min-height: 36px !important;
-    -fx-pref-height: 36px !important;
-    -fx-padding: 10 15 10 15 !important;
-    -fx-font-size: 13px !important;
-    -fx-font-weight: normal;
-    -fx-alignment: center !important;
-}
+/* Toolbar Button Defaults - removed to allow individual button sizing */
+/* Navigation buttons are sized programmatically in MainController */
 
 /* Executive Command Button */
 .btn-executive {
@@ -92,11 +84,11 @@
     -fx-padding: 5 10 5 10;
 }
 
-.tool-bar .button {
-    -fx-min-width: 35;
-    -fx-min-height: 30;
-    -fx-pref-width: 35;
-    -fx-pref-height: 30;
+/* Default button styling for non-navigation buttons */
+.tool-bar .button:not(.nav-button) {
+    -fx-min-width: 80;
+    -fx-min-height: 36;
+    -fx-pref-height: 36;
     -fx-background-radius: 4;
     -fx-border-radius: 4;
 }

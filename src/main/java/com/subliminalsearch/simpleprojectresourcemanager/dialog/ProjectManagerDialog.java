@@ -1,6 +1,7 @@
 package com.subliminalsearch.simpleprojectresourcemanager.dialog;
 
 import com.subliminalsearch.simpleprojectresourcemanager.model.ProjectManager;
+import com.subliminalsearch.simpleprojectresourcemanager.util.PhoneFormatter;
 import javafx.geometry.Insets;
 import javafx.scene.control.*;
 import javafx.scene.layout.GridPane;
@@ -110,7 +111,7 @@ public class ProjectManagerDialog extends Dialog<ProjectManager> {
         emailField.setPromptText("email@example.com");
         
         phoneField = new TextField();
-        phoneField.setPromptText("(555) 123-4567");
+        PhoneFormatter.applyPhoneFormat(phoneField);
         
         departmentField = new TextField();
         departmentField.setPromptText("Engineering, Sales, etc.");
@@ -122,7 +123,9 @@ public class ProjectManagerDialog extends Dialog<ProjectManager> {
         if (existingManager != null) {
             nameField.setText(existingManager.getName());
             emailField.setText(existingManager.getEmail() != null ? existingManager.getEmail() : "");
-            phoneField.setText(existingManager.getPhone() != null ? existingManager.getPhone() : "");
+            if (existingManager.getPhone() != null) {
+                PhoneFormatter.setPhoneNumber(phoneField, existingManager.getPhone());
+            }
             departmentField.setText(existingManager.getDepartment() != null ? existingManager.getDepartment() : "");
             activeCheckBox.setSelected(existingManager.isActive());
             
@@ -216,7 +219,7 @@ public class ProjectManagerDialog extends Dialog<ProjectManager> {
         
         manager.setName(nameField.getText().trim());
         manager.setEmail(emailField.getText().trim());
-        manager.setPhone(phoneField.getText().trim());
+        manager.setPhone(PhoneFormatter.getUnformattedPhone(phoneField));
         manager.setDepartment(departmentField.getText().trim());
         manager.setActive(activeCheckBox.isSelected());
         

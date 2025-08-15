@@ -5,11 +5,13 @@ import com.subliminalsearch.simpleprojectresourcemanager.repository.AssignmentRe
 import com.subliminalsearch.simpleprojectresourcemanager.repository.ProjectManagerRepository;
 import com.subliminalsearch.simpleprojectresourcemanager.repository.ProjectRepository;
 import com.subliminalsearch.simpleprojectresourcemanager.repository.ResourceRepository;
+import com.subliminalsearch.simpleprojectresourcemanager.repository.ResourceUnavailabilityRepository;
 import com.zaxxer.hikari.HikariDataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -23,6 +25,7 @@ public class SchedulingService {
     private final ResourceRepository resourceRepository;
     private final AssignmentRepository assignmentRepository;
     private final ProjectManagerRepository projectManagerRepository;
+    private ResourceUnavailabilityRepository unavailabilityRepository;
     private final HikariDataSource dataSource;
 
     public SchedulingService(ProjectRepository projectRepository, 
@@ -35,6 +38,15 @@ public class SchedulingService {
         this.assignmentRepository = assignmentRepository;
         this.projectManagerRepository = projectManagerRepository;
         this.dataSource = dataSource;
+        // Initialize unavailability repository lazily to avoid issues in tests
+        this.unavailabilityRepository = null;
+    }
+    
+    private ResourceUnavailabilityRepository getUnavailabilityRepository() {
+        if (unavailabilityRepository == null && dataSource != null) {
+            unavailabilityRepository = new ResourceUnavailabilityRepository(dataSource);
+        }
+        return unavailabilityRepository;
     }
     
     // Getter methods for repositories (needed for dialogs)
@@ -290,11 +302,75 @@ public class SchedulingService {
     }
 
     public boolean isResourceAvailable(Long resourceId, LocalDate startDate, LocalDate endDate) {
-        // Check for overlapping assignments (excluding overrides for now)
+        // Check for overlapping assignments (excluding overrides)
         List<Assignment> conflicts = getConflictingAssignments(resourceId, startDate, endDate);
-        return conflicts.stream().noneMatch(a -> !a.isOverride());
+        boolean hasAssignmentConflict = conflicts.stream().anyMatch(a -> !a.isOverride());
+        
+        // Check for resource unavailability (vacation, sick leave, etc.)
+        List<TechnicianUnavailability> unavailabilities = getUnavailabilityRepository() != null ? 
+            getUnavailabilityRepository().findOverlapping(resourceId, startDate, endDate) : 
+            new ArrayList<>();
+        boolean hasUnavailability = !unavailabilities.isEmpty();
+        
+        if (hasUnavailability) {
+            logger.debug("Resource {} is unavailable from {} to {} due to: {}", 
+                resourceId, startDate, endDate, 
+                unavailabilities.stream()
+                    .map(u -> u.getType().getDisplayName())
+                    .collect(Collectors.joining(", ")));
+        }
+        
+        return !hasAssignmentConflict && !hasUnavailability;
     }
 
+    // Resource Unavailability Management
+    public TechnicianUnavailability createUnavailability(Long resourceId, UnavailabilityType type, 
+                                                        LocalDate startDate, LocalDate endDate, String reason) {
+        // Validate resource exists
+        if (!resourceRepository.existsById(resourceId)) {
+            throw new IllegalArgumentException("Resource not found: " + resourceId);
+        }
+        
+        // Validate dates
+        validateProjectDates(startDate, endDate);
+        
+        // Check for existing assignments during this period
+        List<Assignment> conflictingAssignments = getConflictingAssignments(resourceId, startDate, endDate);
+        if (!conflictingAssignments.isEmpty()) {
+            logger.warn("Resource {} has {} existing assignments during unavailability period", 
+                resourceId, conflictingAssignments.size());
+        }
+        
+        TechnicianUnavailability unavailability = new TechnicianUnavailability(resourceId, type, startDate, endDate);
+        unavailability.setReason(reason);
+        
+        return getUnavailabilityRepository() != null ? getUnavailabilityRepository().save(unavailability) : unavailability;
+    }
+    
+    public List<TechnicianUnavailability> getResourceUnavailabilities(Long resourceId) {
+        return getUnavailabilityRepository() != null ? getUnavailabilityRepository().findByResourceId(resourceId) : new ArrayList<>();
+    }
+    
+    public List<TechnicianUnavailability> getUnavailabilitiesInDateRange(LocalDate startDate, LocalDate endDate) {
+        return getUnavailabilityRepository() != null ? getUnavailabilityRepository().findByDateRange(startDate, endDate) : new ArrayList<>();
+    }
+    
+    public void approveUnavailability(Long unavailabilityId, String approvedBy) {
+        if (getUnavailabilityRepository() != null) {
+            getUnavailabilityRepository().approveUnavailability(unavailabilityId, approvedBy);
+        }
+    }
+    
+    public void deleteUnavailability(Long unavailabilityId) {
+        if (getUnavailabilityRepository() != null) {
+            getUnavailabilityRepository().delete(unavailabilityId);
+        }
+    }
+    
+    public List<TechnicianUnavailability> getPendingUnavailabilities() {
+        return getUnavailabilityRepository() != null ? getUnavailabilityRepository().findPendingApproval() : new ArrayList<>();
+    }
+    
     // Utility Methods
     public int getProjectCount() {
         return (int) projectRepository.count();

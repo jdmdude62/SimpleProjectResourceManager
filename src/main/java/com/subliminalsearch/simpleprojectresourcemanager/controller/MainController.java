@@ -7,8 +7,11 @@ import com.subliminalsearch.simpleprojectresourcemanager.dialog.EmailSettingsDia
 import com.subliminalsearch.simpleprojectresourcemanager.dialog.HolidayDialog;
 import com.subliminalsearch.simpleprojectresourcemanager.dialog.ProjectDialog;
 import com.subliminalsearch.simpleprojectresourcemanager.dialog.ProjectManagerDialog;
+import com.subliminalsearch.simpleprojectresourcemanager.dialog.ProjectSelectionDialog;
 import com.subliminalsearch.simpleprojectresourcemanager.dialog.ResourceDialog;
-import com.subliminalsearch.simpleprojectresourcemanager.dialog.UnavailabilityDialog;
+import com.subliminalsearch.simpleprojectresourcemanager.dialog.ResourceUnavailabilityDialog;
+import com.subliminalsearch.simpleprojectresourcemanager.dialog.ManageUnavailabilityDialog;
+import com.subliminalsearch.simpleprojectresourcemanager.dialog.ResourceAvailabilityDialog;
 import com.subliminalsearch.simpleprojectresourcemanager.model.Assignment;
 import com.subliminalsearch.simpleprojectresourcemanager.model.CompanyHoliday;
 import com.subliminalsearch.simpleprojectresourcemanager.model.EmailConfiguration;
@@ -19,12 +22,13 @@ import com.subliminalsearch.simpleprojectresourcemanager.model.ProjectStatus;
 import com.subliminalsearch.simpleprojectresourcemanager.model.Resource;
 import com.subliminalsearch.simpleprojectresourcemanager.model.TechnicianUnavailability;
 import com.subliminalsearch.simpleprojectresourcemanager.model.UnavailabilityType;
+import com.subliminalsearch.simpleprojectresourcemanager.service.FinancialService;
 import com.subliminalsearch.simpleprojectresourcemanager.service.SchedulingService;
 import com.subliminalsearch.simpleprojectresourcemanager.view.ExecutiveCommandCenter;
 import com.subliminalsearch.simpleprojectresourcemanager.view.HolidayCalendarView;
+import com.subliminalsearch.simpleprojectresourcemanager.view.FinancialTrackingDialog;
 import com.subliminalsearch.simpleprojectresourcemanager.view.ProjectGridView;
 import com.subliminalsearch.simpleprojectresourcemanager.view.ReportCenterView;
-import com.subliminalsearch.simpleprojectresourcemanager.view.ResourceAvailabilityView;
 import com.subliminalsearch.simpleprojectresourcemanager.view.TaskListView;
 import com.subliminalsearch.simpleprojectresourcemanager.repository.TaskRepository;
 import javafx.application.Platform;
@@ -75,14 +79,22 @@ public class MainController implements Initializable {
     @FXML private MenuItem menuProjectManagers;
     @FXML private MenuItem menuProjectGrid;
     @FXML private MenuItem menuProjectTasks;
-    @FXML private MenuItem menuTechUnavailability;
-    @FXML private MenuItem menuHolidayCalendar;
     @FXML private MenuItem menuHolidayCalendarView;
-    @FXML private MenuItem menuLoadGardenData;
-    @FXML private MenuItem menuClearOldData;
     @FXML private MenuItem menuResourceAvailabilityView;
     @FXML private MenuItem menuEmailSettings;
     @FXML private MenuItem menuReportCenter;
+    @FXML private MenuItem menuFinancialTracking;
+    @FXML private RadioMenuItem menuMonthView;
+    @FXML private RadioMenuItem menuWeekView;
+    @FXML private RadioMenuItem menuDayView;
+    @FXML private MenuItem menuRefresh;
+    @FXML private MenuItem menuQuickRevenueBudget;
+    @FXML private MenuItem menuQuickResourceUtil;
+    @FXML private MenuItem menuQuickProjectStatus;
+    @FXML private MenuItem menuQuickWorkload;
+    @FXML private MenuItem menuUserGuide;
+    @FXML private MenuItem menuKeyboardShortcuts;
+    @FXML private MenuItem menuAbout;
 
     // FXML Components - Toolbar
     @FXML private Button btnPrevDay;
@@ -108,8 +120,6 @@ public class MainController implements Initializable {
     @FXML private Button btnNewProject;
     @FXML private Button btnNewResource;
     @FXML private Button btnNewAssignment;
-    @FXML private Button btnEditSelected;
-    @FXML private Button btnDeleteSelected;
     @FXML private Button btnExecutiveView;
 
     // Timeline Component
@@ -149,14 +159,33 @@ public class MainController implements Initializable {
         zoomCombo.setItems(FXCollections.observableArrayList("100%", "125%", "150%", "200%", "250%", "300%"));
         zoomCombo.setValue("100%");
         
-        // Set button tooltips
-        btnPrevDay.setTooltip(new Tooltip("Previous Day (Ctrl+Left)"));
-        btnPrevWeek.setTooltip(new Tooltip("Previous Week (Shift+Left)"));
-        btnPrevMonth.setTooltip(new Tooltip("Previous Month (Ctrl+Shift+Left)"));
-        btnToday.setTooltip(new Tooltip("Today (Ctrl+Home)"));
-        btnNextDay.setTooltip(new Tooltip("Next Day (Ctrl+Right)"));
-        btnNextWeek.setTooltip(new Tooltip("Next Week (Shift+Right)"));
-        btnNextMonth.setTooltip(new Tooltip("Next Month (Ctrl+Shift+Right)"));
+        // Add nav-button class to all navigation buttons
+        btnPrevDay.getStyleClass().add("nav-button");
+        btnPrevWeek.getStyleClass().add("nav-button");
+        btnPrevMonth.getStyleClass().add("nav-button");
+        btnNextDay.getStyleClass().add("nav-button");
+        btnNextWeek.getStyleClass().add("nav-button");
+        btnNextMonth.getStyleClass().add("nav-button");
+        
+        // Make all navigation buttons equal size and same height as Today button (36px)
+        String navButtonStyle = "-fx-padding: 5 8 5 8 !important; -fx-font-size: 12px !important; -fx-min-width: 40 !important; -fx-pref-width: 40 !important; -fx-max-width: 40 !important; -fx-min-height: 36 !important; -fx-pref-height: 36 !important;";
+        
+        // Apply equal sizing to all navigation buttons
+        btnPrevDay.setStyle(navButtonStyle);
+        btnPrevWeek.setStyle(navButtonStyle);
+        btnPrevMonth.setStyle(navButtonStyle);
+        btnNextDay.setStyle(navButtonStyle);
+        btnNextWeek.setStyle(navButtonStyle);
+        btnNextMonth.setStyle(navButtonStyle);
+        
+        // Set button tooltips with clear descriptions
+        btnPrevDay.setTooltip(new Tooltip("Go back one day (Ctrl+Left)"));
+        btnPrevWeek.setTooltip(new Tooltip("Go back one week (Shift+Left)"));
+        btnPrevMonth.setTooltip(new Tooltip("Go back one month (Ctrl+Shift+Left)"));
+        btnToday.setTooltip(new Tooltip("Jump to today's date (Ctrl+Home)"));
+        btnNextDay.setTooltip(new Tooltip("Go forward one day (Ctrl+Right)"));
+        btnNextWeek.setTooltip(new Tooltip("Go forward one week (Shift+Right)"));
+        btnNextMonth.setTooltip(new Tooltip("Go forward one month (Ctrl+Shift+Right)"));
     }
 
     private void setupFilters() {
@@ -270,6 +299,8 @@ public class MainController implements Initializable {
         timelineView.setOnDeleteProject(this::deleteProject);
         timelineView.setOnEditResource(this::editResource);
         timelineView.setOnDeleteResource(this::deleteResource);
+        timelineView.setOnMarkResourceUnavailable(this::markResourceUnavailable);
+        timelineView.setOnViewResourceUnavailability(this::viewResourceUnavailability);
         timelineView.setOnEditAssignment(this::editAssignment);
         timelineView.setOnDeleteAssignment(this::deleteAssignment);
         timelineView.setOnDuplicateAssignment(this::duplicateAssignment);
@@ -334,8 +365,6 @@ public class MainController implements Initializable {
         btnNewProject.setOnAction(e -> createNewProject());
         btnNewResource.setOnAction(e -> createNewResource());
         btnNewAssignment.setOnAction(e -> createNewAssignment());
-        btnEditSelected.setOnAction(e -> editSelected());
-        btnDeleteSelected.setOnAction(e -> deleteSelected());
         btnExecutiveView.setOnAction(e -> showExecutiveCommandCenter());
         
         // Menu item handlers
@@ -345,10 +374,6 @@ public class MainController implements Initializable {
         menuProjectManagers.setOnAction(e -> manageProjectManagers());
         menuProjectGrid.setOnAction(e -> showProjectGridView());
         menuProjectTasks.setOnAction(e -> showProjectTasks());
-        menuTechUnavailability.setOnAction(e -> manageTechnicianUnavailability());
-        menuHolidayCalendar.setOnAction(e -> manageHolidayCalendar());
-        menuLoadGardenData.setOnAction(e -> loadGardenDemoData());
-        menuClearOldData.setOnAction(e -> clearOldTestData());
         
         // Email settings handler
         if (menuEmailSettings != null) {
@@ -613,13 +638,6 @@ public class MainController implements Initializable {
         }
     }
 
-    private void editSelected() {
-        showInfoAlert("Edit Item", "Please right-click on projects or resources to edit them.");
-    }
-
-    private void deleteSelected() {
-        showInfoAlert("Delete Item", "Please right-click on projects or resources to delete them.");
-    }
     
     // Context menu handlers
     private void changeProjectStatus(Project project, ProjectStatus newStatus) {
@@ -746,6 +764,46 @@ public class MainController implements Initializable {
         }
     }
     
+    private void markResourceUnavailable(Resource resource) {
+        ResourceUnavailabilityDialog dialog = new ResourceUnavailabilityDialog(
+            schedulingService, 
+            schedulingService.getAllResources(),
+            resource,
+            null
+        );
+        
+        Optional<TechnicianUnavailability> result = dialog.showAndWait();
+        if (result.isPresent()) {
+            try {
+                TechnicianUnavailability unavailability = result.get();
+                schedulingService.createUnavailability(
+                    unavailability.getResourceId(),
+                    unavailability.getType(),
+                    unavailability.getStartDate(),
+                    unavailability.getEndDate(),
+                    unavailability.getReason()
+                );
+                
+                showInfoAlert("Resource Unavailability", 
+                    "Resource marked as unavailable from " + unavailability.getStartDate() + 
+                    " to " + unavailability.getEndDate());
+                
+                refreshData();
+            } catch (Exception e) {
+                logger.error("Failed to create resource unavailability", e);
+                showErrorAlert("Failed to mark resource as unavailable", e.getMessage());
+            }
+        }
+    }
+    
+    private void viewResourceUnavailability(Resource resource) {
+        ManageUnavailabilityDialog dialog = new ManageUnavailabilityDialog(schedulingService, resource);
+        dialog.showAndWait();
+        
+        // Refresh the timeline to show any changes
+        refreshData();
+    }
+    
     private void deleteResource(Resource resource) {
         if (ResourceDialog.showDeleteConfirmation(resource)) {
             try {
@@ -860,34 +918,6 @@ public class MainController implements Initializable {
     }
     
     // New feature management methods
-    private void manageTechnicianUnavailability() {
-        List<Resource> resources = schedulingService.getAllResources();
-        
-        if (resources.isEmpty()) {
-            showErrorAlert("No Resources", "Please create at least one resource before managing unavailability.");
-            return;
-        }
-        
-        UnavailabilityDialog dialog = new UnavailabilityDialog(resources);
-        Optional<TechnicianUnavailability> result = dialog.showAndWait();
-        
-        if (result.isPresent()) {
-            try {
-                TechnicianUnavailability unavailability = result.get();
-                // TODO: Add service method to save unavailability
-                logger.info("Created new unavailability: {} for resource {}", 
-                    unavailability.getType(), unavailability.getResourceId());
-                
-                showInfoAlert("Success", "Technician unavailability created successfully.\n\n" +
-                    "Note: Database integration pending - this will be saved once the unavailability tables are created.");
-                
-            } catch (Exception e) {
-                logger.error("Error creating unavailability", e);
-                showErrorAlert("Error", "Failed to create unavailability: " + e.getMessage());
-            }
-        }
-    }
-    
     private void manageHolidayCalendar() {
         HolidayDialog dialog = new HolidayDialog();
         Optional<CompanyHoliday> result = dialog.showAndWait();
@@ -987,28 +1017,10 @@ public class MainController implements Initializable {
                 return;
             }
             
-            // Create choice dialog for project selection
-            ChoiceDialog<Project> dialog = new ChoiceDialog<>(projects.get(0), projects);
-            dialog.setTitle("Select Project");
-            dialog.setHeaderText("Select a project to manage tasks");
-            dialog.setContentText("Project:");
-            
-            // Get the combo box from the dialog and set custom converter
-            ComboBox<Project> comboBox = (ComboBox<Project>) dialog.getDialogPane().lookup(".combo-box");
-            if (comboBox != null) {
-                comboBox.setConverter(new StringConverter<Project>() {
-                    @Override
-                    public String toString(Project project) {
-                        if (project == null) return "";
-                        return project.getProjectId() + " - " + project.getDescription();
-                    }
-                    
-                    @Override
-                    public Project fromString(String string) {
-                        return null;
-                    }
-                });
-            }
+            // Create custom project selection dialog with filters
+            ProjectSelectionDialog dialog = new ProjectSelectionDialog(projects, 
+                "Select Project for Tasks", 
+                "Select a project to manage tasks");
             
             Optional<Project> result = dialog.showAndWait();
             if (result.isPresent()) {
@@ -1034,37 +1046,11 @@ public class MainController implements Initializable {
     }
     
     private void showResourceAvailabilityView() {
-        try {
-            // Create the resource availability view
-            ResourceAvailabilityView availabilityView = new ResourceAvailabilityView();
-            
-            // Set data
-            availabilityView.setResources(schedulingService.getAllResources());
-            availabilityView.setAssignments(schedulingService.getAssignmentsByDateRange(
-                LocalDate.now().minusMonths(3), 
-                LocalDate.now().plusMonths(3)
-            ));
-            
-            // Create sample unavailabilities and holidays for demonstration
-            List<TechnicianUnavailability> sampleUnavailabilities = createSampleUnavailabilities();
-            availabilityView.setUnavailabilities(sampleUnavailabilities);
-            
-            List<CompanyHoliday> sampleHolidays = createSampleHolidays();
-            availabilityView.setHolidays(sampleHolidays);
-            
-            // Create and show window
-            Stage stage = new Stage();
-            stage.setTitle("Resource Availability Calendar");
-            stage.initModality(Modality.NONE);
-            stage.setScene(new Scene(availabilityView, 1400, 850));
-            stage.setMinWidth(1200);
-            stage.setMinHeight(700);
-            stage.show();
-            
-        } catch (Exception e) {
-            logger.error("Error showing resource availability view", e);
-            showErrorAlert("Error", "Failed to show resource availability: " + e.getMessage());
-        }
+        ResourceAvailabilityDialog dialog = new ResourceAvailabilityDialog(schedulingService);
+        dialog.showAndWait();
+        
+        // Refresh timeline to show any changes
+        refreshData();
     }
     
     private List<CompanyHoliday> createSampleHolidays() {
@@ -1295,11 +1281,21 @@ public class MainController implements Initializable {
             }
             
             // Update timeline data
-            logger.info("Setting timeline data - Projects: {}, Resources: {}, Assignments: {}", 
-                projects.size(), resources.size(), assignments.size());
+            // Fetch unavailabilities for the date range
+            List<TechnicianUnavailability> unavailabilities = schedulingService.getUnavailabilitiesInDateRange(startDate, endDate);
+            
+            // Fetch company holidays (using sample data for now until database integration)
+            List<CompanyHoliday> holidays = createSampleHolidays().stream()
+                .filter(h -> !h.getDate().isBefore(startDate) && !h.getDate().isAfter(endDate))
+                .toList();
+            
+            logger.info("Setting timeline data - Projects: {}, Resources: {}, Assignments: {}, Unavailabilities: {}, Holidays: {}", 
+                projects.size(), resources.size(), assignments.size(), unavailabilities.size(), holidays.size());
             timelineView.getProjects().setAll(projects);
             timelineView.getResources().setAll(resources);
             timelineView.getAssignments().setAll(assignments);
+            timelineView.getUnavailabilities().setAll(unavailabilities);
+            timelineView.getCompanyHolidays().setAll(holidays);
             
             // Detect and highlight conflicts
             Set<Long> conflicts = schedulingService.detectAllConflicts(startDate, endDate);
@@ -1349,6 +1345,118 @@ public class MainController implements Initializable {
         alert.showAndWait();
     }
 
+    @FXML
+    private void openFinancialTracking() {
+        // Show project selection dialog
+        List<Project> projects = schedulingService.getAllProjects();
+        if (projects.isEmpty()) {
+            showInfoAlert("No Projects", "Please create a project first before accessing financial tracking.");
+            return;
+        }
+        
+        ChoiceDialog<Project> dialog = new ChoiceDialog<>(projects.get(0), projects);
+        dialog.setTitle("Select Project");
+        dialog.setHeaderText("Select a project for financial tracking");
+        dialog.setContentText("Project:");
+        
+        Optional<Project> result = dialog.showAndWait();
+        if (result.isPresent()) {
+            Project selectedProject = result.get();
+            // Open financial tracking dialog with FinancialService
+            FinancialService financialService = new FinancialService(
+                schedulingService.getDataSource(), 
+                schedulingService.getProjectRepository()
+            );
+            FinancialTrackingDialog financialDialog = new FinancialTrackingDialog(selectedProject, financialService);
+            financialDialog.showAndWait();
+        }
+    }
+    
+    @FXML
+    private void openQuickRevenueBudget() {
+        openReportCenterWithReport("Revenue/Budget Report");
+    }
+    
+    @FXML
+    private void openQuickResourceUtil() {
+        openReportCenterWithReport("Resource Utilization Report");
+    }
+    
+    @FXML
+    private void openQuickProjectStatus() {
+        openReportCenterWithReport("Project Status Report");
+    }
+    
+    @FXML
+    private void openQuickWorkload() {
+        openReportCenterWithReport("Workload Report");
+    }
+    
+    private void openReportCenterWithReport(String reportType) {
+        try {
+            ReportCenterView reportCenter = new ReportCenterView(schedulingService);
+            reportCenter.selectReport(reportType);
+            reportCenter.show();
+        } catch (Exception e) {
+            logger.error("Error opening report: " + reportType, e);
+            showErrorAlert("Error", "Failed to open report: " + e.getMessage());
+        }
+    }
+    
+    @FXML
+    private void openUserGuide() {
+        showInfoAlert("User Guide", "User guide will be available in a future update.");
+    }
+    
+    @FXML
+    private void openKeyboardShortcuts() {
+        showInfoAlert("Keyboard Shortcuts", 
+            "Common Shortcuts:\n\n" +
+            "Ctrl+N - New Project\n" +
+            "Ctrl+R - New Resource\n" +
+            "Ctrl+A - New Assignment\n" +
+            "F5 - Refresh View\n" +
+            "Ctrl+Q - Exit Application");
+    }
+    
+    @FXML
+    private void openAbout() {
+        showInfoAlert("About", 
+            "Simple Project Resource Manager\n" +
+            "Version 1.0\n\n" +
+            "A comprehensive project scheduling and resource management application.\n\n" +
+            "© 2025 Subliminal Search");
+    }
+    
+    @FXML
+    private void handleExit() {
+        // Show confirmation dialog
+        Alert confirmDialog = new Alert(Alert.AlertType.CONFIRMATION);
+        confirmDialog.setTitle("Exit Application");
+        confirmDialog.setHeaderText("Exit Simple Project Resource Manager");
+        confirmDialog.setContentText("Are you sure you want to exit the application?");
+        
+        Optional<ButtonType> result = confirmDialog.showAndWait();
+        if (result.isPresent() && result.get() == ButtonType.OK) {
+            logger.info("Application exit requested by user");
+            
+            // Clean shutdown
+            try {
+                // Close any open database connections if needed
+                if (schedulingService != null) {
+                    // Any cleanup needed
+                }
+                
+                // Exit the application
+                Platform.exit();
+                System.exit(0);
+            } catch (Exception e) {
+                logger.error("Error during application shutdown", e);
+                System.exit(1);
+            }
+        }
+    }
+    
     private void showErrorAlert(String title, String message) {
         Alert alert = new Alert(Alert.AlertType.ERROR);
         alert.setTitle(title);
@@ -1425,6 +1533,11 @@ public class MainController implements Initializable {
                 }
             }
         });
+    }
+    
+    @FXML
+    private void handleExecutiveView() {
+        showExecutiveCommandCenter();
     }
     
     private void showExecutiveCommandCenter() {

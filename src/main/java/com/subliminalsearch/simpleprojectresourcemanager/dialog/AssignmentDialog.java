@@ -5,6 +5,8 @@ import com.subliminalsearch.simpleprojectresourcemanager.model.Project;
 import com.subliminalsearch.simpleprojectresourcemanager.model.ProjectManager;
 import com.subliminalsearch.simpleprojectresourcemanager.model.Resource;
 import com.subliminalsearch.simpleprojectresourcemanager.service.SchedulingService;
+import com.subliminalsearch.simpleprojectresourcemanager.util.InputValidator;
+import com.subliminalsearch.simpleprojectresourcemanager.util.InputValidator.ValidationResult;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
@@ -19,6 +21,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -38,10 +41,18 @@ public class AssignmentDialog extends Dialog<Assignment> {
     private final TextArea notesArea;
     private final Button editProjectButton;
     
+    // Filter fields
+    private final DatePicker filterStartDatePicker;
+    private final Spinner<Integer> filterDateRangeSpinner;
+    private final TextField filterProjectIdField;
+    private final TextField filterDescriptionField;
+    private final Button clearFiltersButton;
+    
     private final boolean isEditMode;
     private final Assignment existingAssignment;
     private final List<Project> availableProjects;
     private final List<Resource> availableResources;
+    private ObservableList<Project> filteredProjects;
     private SchedulingService schedulingService;
     private Label conflictWarningLabel;
     private Label validationLabel;
@@ -69,8 +80,41 @@ public class AssignmentDialog extends Dialog<Assignment> {
         setTitle(isEditMode ? "Edit Assignment" : "Create New Assignment");
         setHeaderText(isEditMode ? "Edit assignment details" : "Assign resource to project");
         
+        // Initialize filtered projects list
+        this.filteredProjects = FXCollections.observableArrayList(projects);
+        
+        // Create filter fields
+        filterStartDatePicker = new DatePicker();
+        filterStartDatePicker.setPromptText("Estimated start date");
+        filterStartDatePicker.setPrefWidth(150);
+        
+        // Add date validation to filter date picker as well
+        addFlexibleDateParser(filterStartDatePicker);
+        
+        filterDateRangeSpinner = new Spinner<>(0, 365, 15);
+        filterDateRangeSpinner.setEditable(true);
+        filterDateRangeSpinner.setPrefWidth(80);
+        filterDateRangeSpinner.setTooltip(new Tooltip("±days from start date"));
+        
+        filterProjectIdField = new TextField();
+        filterProjectIdField.setPromptText("Project ID...");
+        filterProjectIdField.setPrefWidth(150);
+        
+        filterDescriptionField = new TextField();
+        filterDescriptionField.setPromptText("Description...");
+        filterDescriptionField.setPrefWidth(200);
+        
+        clearFiltersButton = new Button("Clear");
+        clearFiltersButton.setOnAction(e -> clearFilters());
+        
+        // Set up filter listeners
+        filterStartDatePicker.valueProperty().addListener((obs, oldVal, newVal) -> applyFilters());
+        filterDateRangeSpinner.valueProperty().addListener((obs, oldVal, newVal) -> applyFilters());
+        filterProjectIdField.textProperty().addListener((obs, oldVal, newVal) -> applyFilters());
+        filterDescriptionField.textProperty().addListener((obs, oldVal, newVal) -> applyFilters());
+        
         // Create form fields
-        projectCombo = new ComboBox<>(FXCollections.observableArrayList(projects));
+        projectCombo = new ComboBox<>(filteredProjects);
         projectCombo.setConverter(createProjectStringConverter());
         
         resourceCombo = new ComboBox<>(FXCollections.observableArrayList(resources));
@@ -112,7 +156,8 @@ public class AssignmentDialog extends Dialog<Assignment> {
         
         // Create edit project button
         editProjectButton = new Button("Edit Client Info");
-        editProjectButton.setDisable(true);
+        editProjectButton.setVisible(false);
+        editProjectButton.setManaged(false);
         editProjectButton.setOnAction(e -> editProjectClientInfo());
         
         // Create conflict warning label
@@ -144,12 +189,18 @@ public class AssignmentDialog extends Dialog<Assignment> {
                     endDatePicker.setValue(newVal.getStartDate().plusDays(7));
                 }
                 updateProjectManagerCombo(newVal);
-                editProjectButton.setDisable(false);
+                editProjectButton.setVisible(true);
+                editProjectButton.setManaged(true);
             } else {
                 projectManagerCombo.setValue(null);
-                editProjectButton.setDisable(true);
+                editProjectButton.setVisible(false);
+                editProjectButton.setManaged(false);
             }
         });
+        
+        // Add flexible date parsing and validation
+        addFlexibleDateParser(startDatePicker);
+        addFlexibleDateParser(endDatePicker);
         
         // Ensure end date is not before start date
         startDatePicker.valueProperty().addListener((obs, oldVal, newVal) -> {
@@ -157,10 +208,14 @@ public class AssignmentDialog extends Dialog<Assignment> {
                 endDatePicker.setValue(newVal.plusDays(1));
             }
             checkForConflicts();
+            validateDates();
         });
         
         // Check conflicts when dates or resource change
-        endDatePicker.valueProperty().addListener((obs, oldVal, newVal) -> checkForConflicts());
+        endDatePicker.valueProperty().addListener((obs, oldVal, newVal) -> {
+            checkForConflicts();
+            validateDates();
+        });
         resourceCombo.valueProperty().addListener((obs, oldVal, newVal) -> {
             checkForConflicts();
             updateResourceStyle();
@@ -177,6 +232,8 @@ public class AssignmentDialog extends Dialog<Assignment> {
             if (selectedProject != null) {
                 projectCombo.setValue(selectedProject);
                 updateProjectManagerCombo(selectedProject);
+                editProjectButton.setVisible(true);
+                editProjectButton.setManaged(true);
             }
             
             // Find and select resource
@@ -225,9 +282,88 @@ public class AssignmentDialog extends Dialog<Assignment> {
         // Set result converter
         setResultConverter(createResultConverter());
         
-        // Set dialog size
-        getDialogPane().setPrefWidth(550);
-        getDialogPane().setPrefHeight(500);
+        // Set dialog size (increased to accommodate filters and all fields)
+        getDialogPane().setPrefWidth(650);
+        getDialogPane().setPrefHeight(700);
+        getDialogPane().setMinHeight(650);
+    }
+    
+    private void applyFilters() {
+        List<Project> filtered = new ArrayList<>(availableProjects);
+        
+        // Filter by estimated start date range
+        if (filterStartDatePicker.getValue() != null) {
+            LocalDate centerDate = filterStartDatePicker.getValue();
+            int rangeDays = filterDateRangeSpinner.getValue();
+            LocalDate startRange = centerDate.minusDays(rangeDays);
+            LocalDate endRange = centerDate.plusDays(rangeDays);
+            
+            filtered = filtered.stream()
+                .filter(p -> {
+                    // Include projects whose date range overlaps with the filter range
+                    return !(p.getEndDate().isBefore(startRange) || p.getStartDate().isAfter(endRange));
+                })
+                .collect(Collectors.toList());
+        }
+        
+        // Filter by project ID (fuzzy search - case insensitive)
+        String projectIdFilter = filterProjectIdField.getText().trim().toLowerCase();
+        if (!projectIdFilter.isEmpty()) {
+            filtered = filtered.stream()
+                .filter(p -> p.getProjectId().toLowerCase().contains(projectIdFilter))
+                .collect(Collectors.toList());
+        }
+        
+        // Filter by description (fuzzy search - case insensitive)
+        String descriptionFilter = filterDescriptionField.getText().trim().toLowerCase();
+        if (!descriptionFilter.isEmpty()) {
+            filtered = filtered.stream()
+                .filter(p -> p.getDescription().toLowerCase().contains(descriptionFilter))
+                .collect(Collectors.toList());
+        }
+        
+        // Update the filtered list and refresh combo box
+        filteredProjects.clear();
+        filteredProjects.addAll(filtered);
+        
+        // Update project count label
+        HBox projectBox = (HBox) projectCombo.getParent();
+        if (projectBox != null && projectBox.getChildren().size() > 1) {
+            Label countLabel = (Label) projectBox.getChildren().get(1);
+            countLabel.setText("(" + filtered.size() + " projects)");
+            
+            // Change color based on filter status
+            if (filtered.size() < availableProjects.size()) {
+                countLabel.setStyle("-fx-text-fill: #1976d2; -fx-font-size: 11px; -fx-font-weight: bold;");
+            } else {
+                countLabel.setStyle("-fx-text-fill: #666; -fx-font-size: 11px;");
+            }
+        }
+        
+        // Preserve current selection if it's still in the filtered list
+        Project currentSelection = projectCombo.getValue();
+        if (currentSelection != null && !filtered.contains(currentSelection)) {
+            projectCombo.setValue(null);
+        }
+    }
+    
+    private void clearFilters() {
+        filterStartDatePicker.setValue(null);
+        filterDateRangeSpinner.getValueFactory().setValue(15);
+        filterProjectIdField.clear();
+        filterDescriptionField.clear();
+        
+        // Reset to show all projects
+        filteredProjects.clear();
+        filteredProjects.addAll(availableProjects);
+        
+        // Update count label
+        HBox projectBox = (HBox) projectCombo.getParent();
+        if (projectBox != null && projectBox.getChildren().size() > 1) {
+            Label countLabel = (Label) projectBox.getChildren().get(1);
+            countLabel.setText("(" + availableProjects.size() + " projects)");
+            countLabel.setStyle("-fx-text-fill: #666; -fx-font-size: 11px;");
+        }
     }
     
     private GridPane createFormLayout() {
@@ -246,10 +382,50 @@ public class AssignmentDialog extends Dialog<Assignment> {
         grid.add(conflictWarningLabel, 0, row, 2, 1);
         row++;
         
+        // Add filter section
+        VBox filterSection = new VBox(10);
+        filterSection.setStyle("-fx-background-color: #f5f5f5; -fx-padding: 10; -fx-border-color: #ddd; -fx-border-radius: 5; -fx-background-radius: 5;");
+        
+        Label filterLabel = new Label("Filter Projects:");
+        filterLabel.setStyle("-fx-font-weight: bold;");
+        
+        HBox dateFilterBox = new HBox(10);
+        dateFilterBox.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+        dateFilterBox.getChildren().addAll(
+            new Label("Start Date:"), filterStartDatePicker,
+            new Label("±"), filterDateRangeSpinner, new Label("days")
+        );
+        
+        HBox textFilterBox = new HBox(10);
+        textFilterBox.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+        textFilterBox.getChildren().addAll(
+            new Label("Project ID:"), filterProjectIdField,
+            new Label("Description:"), filterDescriptionField,
+            clearFiltersButton
+        );
+        
+        filterSection.getChildren().addAll(filterLabel, dateFilterBox, textFilterBox);
+        grid.add(filterSection, 0, row, 2, 1);
+        row++;
+        
+        // Add some spacing after filters
+        grid.add(new Label(""), 0, row);
+        row++;
+        
+        // Edit Client Info button (separate row, right-aligned)
+        HBox editButtonBox = new HBox();
+        editButtonBox.setAlignment(javafx.geometry.Pos.CENTER_RIGHT);
+        editButtonBox.getChildren().add(editProjectButton);
+        grid.add(editButtonBox, 1, row);
+        GridPane.setHgrow(editButtonBox, Priority.ALWAYS);
+        row++;
+        
         // Project
         grid.add(new Label("Project:"), 0, row);
         HBox projectBox = new HBox(10);
-        projectBox.getChildren().addAll(projectCombo, editProjectButton);
+        Label projectCountLabel = new Label("(" + filteredProjects.size() + " projects)");
+        projectCountLabel.setStyle("-fx-text-fill: #666; -fx-font-size: 11px;");
+        projectBox.getChildren().addAll(projectCombo, projectCountLabel);
         HBox.setHgrow(projectCombo, Priority.ALWAYS);
         grid.add(projectBox, 1, row);
         GridPane.setHgrow(projectBox, Priority.ALWAYS);
@@ -367,7 +543,7 @@ public class AssignmentDialog extends Dialog<Assignment> {
             
             @Override
             public Project fromString(String string) {
-                return availableProjects.stream()
+                return filteredProjects.stream()
                     .filter(p -> (p.getProjectId() + " - " + p.getDescription()).equals(string))
                     .findFirst()
                     .orElse(null);
@@ -673,6 +849,117 @@ public class AssignmentDialog extends Dialog<Assignment> {
                 };
             }
         });
+    }
+    
+    private void addFlexibleDateParser(DatePicker picker) {
+        picker.getEditor().focusedProperty().addListener((obs, wasFocused, isNowFocused) -> {
+            if (!isNowFocused) {
+                String text = picker.getEditor().getText();
+                if (text != null && !text.trim().isEmpty()) {
+                    try {
+                        // Try to parse with multiple formats
+                        LocalDate date = parseFlexibleDate(text);
+                        if (date != null) {
+                            picker.setValue(date);
+                            picker.getEditor().setStyle("");
+                        } else {
+                            // Show error styling for invalid date
+                            picker.getEditor().setStyle("-fx-border-color: #d32f2f; -fx-border-width: 1px;");
+                            validationLabel.setText("Invalid date format. Use MM/DD/YYYY or YYYY-MM-DD");
+                            validationLabel.setVisible(true);
+                        }
+                    } catch (Exception e) {
+                        // Invalid date format
+                        picker.getEditor().setStyle("-fx-border-color: #d32f2f; -fx-border-width: 1px;");
+                        validationLabel.setText("Invalid date format. Use MM/DD/YYYY or YYYY-MM-DD");
+                        validationLabel.setVisible(true);
+                    }
+                } else {
+                    picker.getEditor().setStyle("");
+                }
+            }
+        });
+        
+        // Clear error styling when user starts typing again
+        picker.getEditor().textProperty().addListener((obs, oldVal, newVal) -> {
+            if (picker.getEditor().isFocused()) {
+                picker.getEditor().setStyle("");
+            }
+        });
+    }
+    
+    private LocalDate parseFlexibleDate(String dateStr) {
+        if (dateStr == null || dateStr.trim().isEmpty()) {
+            return null;
+        }
+        
+        dateStr = dateStr.trim();
+        
+        // Common date formats to try
+        String[] patterns = {
+            "M/d/yyyy", "MM/dd/yyyy", "M-d-yyyy", "MM-dd-yyyy",
+            "yyyy-MM-dd", "yyyy/MM/dd", "d/M/yyyy", "dd/MM/yyyy",
+            "M/d/yy", "MM/dd/yy"  // Also support 2-digit years
+        };
+        
+        for (String pattern : patterns) {
+            try {
+                LocalDate date = LocalDate.parse(dateStr, 
+                    java.time.format.DateTimeFormatter.ofPattern(pattern));
+                
+                // If 2-digit year, adjust to 2000s or 1900s
+                if (pattern.endsWith("yy") && date.getYear() < 100) {
+                    int year = date.getYear();
+                    if (year < 50) {
+                        date = date.plusYears(2000);
+                    } else {
+                        date = date.plusYears(1900);
+                    }
+                }
+                
+                return date;
+            } catch (Exception e) {
+                // Try next pattern
+            }
+        }
+        
+        // Try smart parsing for common formats
+        if (dateStr.matches("\\d{1,2}/\\d{1,2}/\\d{4}")) {
+            String[] parts = dateStr.split("/");
+            try {
+                int month = Integer.parseInt(parts[0]);
+                int day = Integer.parseInt(parts[1]);
+                int year = Integer.parseInt(parts[2]);
+                return LocalDate.of(year, month, day);
+            } catch (Exception e) {
+                // Invalid date components
+            }
+        }
+        
+        return null;
+    }
+    
+    private void validateDates() {
+        if (startDatePicker.getValue() != null && endDatePicker.getValue() != null) {
+            ValidationResult result = InputValidator.validateDateRange(
+                startDatePicker.getValue(),
+                endDatePicker.getValue()
+            );
+            
+            if (!result.isValid()) {
+                validationLabel.setText(result.getErrorMessage());
+                validationLabel.setVisible(true);
+                startDatePicker.setStyle("-fx-border-color: #d32f2f; -fx-border-width: 1px;");
+                endDatePicker.setStyle("-fx-border-color: #d32f2f; -fx-border-width: 1px;");
+            } else {
+                // Clear date validation error if dates are valid
+                if (!conflictWarningLabel.isVisible()) {
+                    validationLabel.setVisible(false);
+                }
+                startDatePicker.setStyle("");
+                endDatePicker.setStyle("");
+            }
+        }
     }
     
     /**

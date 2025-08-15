@@ -3,6 +3,8 @@ package com.subliminalsearch.simpleprojectresourcemanager.view;
 import com.subliminalsearch.simpleprojectresourcemanager.model.*;
 import com.subliminalsearch.simpleprojectresourcemanager.service.*;
 import javafx.application.Platform;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 import javafx.concurrent.Task;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -143,6 +145,26 @@ public class ReportCenterView extends Stage {
         }
     }
     
+    public void selectReport(String reportName) {
+        // Map report names to tabs
+        switch (reportName) {
+            case "Revenue/Budget Report":
+                reportTabs.getSelectionModel().select(3); // Revenue tab
+                break;
+            case "Resource Utilization Report":
+                reportTabs.getSelectionModel().select(1); // Resource tab
+                break;
+            case "Project Status Report":
+                reportTabs.getSelectionModel().select(0); // Client Projects tab
+                break;
+            case "Workload Report":
+                reportTabs.getSelectionModel().select(1); // Resource tab (workload is part of resource utilization)
+                break;
+            default:
+                logger.warn("Unknown report type: " + reportName);
+        }
+    }
+    
     private ToolBar createToolBar() {
         ToolBar toolBar = new ToolBar();
         
@@ -218,28 +240,108 @@ public class ReportCenterView extends Stage {
         content.setPadding(new Insets(20));
         content.setAlignment(Pos.TOP_CENTER);
         
+        // Create filtered project list
+        List<Project> allProjects = new ArrayList<>(schedulingService.getAllProjects());
+        ObservableList<Project> filteredProjects = FXCollections.observableArrayList(allProjects);
+        
         // Project selector
-        ComboBox<Project> projectCombo = new ComboBox<>();
+        ComboBox<Project> projectCombo = new ComboBox<>(filteredProjects);
         projectCombo.setPromptText("Select a project to preview report");
         projectCombo.setPrefWidth(400);
         
-        // Update project list when date range changes
-        Runnable updateProjectList = () -> {
+        // Create filter controls
+        DatePicker filterStartDatePicker = new DatePicker();
+        filterStartDatePicker.setPromptText("Estimated start date");
+        filterStartDatePicker.setPrefWidth(150);
+        
+        Spinner<Integer> filterDateRangeSpinner = new Spinner<>(0, 365, 15);
+        filterDateRangeSpinner.setEditable(true);
+        filterDateRangeSpinner.setPrefWidth(80);
+        filterDateRangeSpinner.setTooltip(new Tooltip("±days from start date"));
+        
+        TextField filterProjectIdField = new TextField();
+        filterProjectIdField.setPromptText("Project ID...");
+        filterProjectIdField.setPrefWidth(150);
+        
+        TextField filterDescriptionField = new TextField();
+        filterDescriptionField.setPromptText("Description...");
+        filterDescriptionField.setPrefWidth(200);
+        
+        Button clearFiltersButton = new Button("Clear");
+        
+        Label projectCountLabel = new Label("(" + allProjects.size() + " projects)");
+        projectCountLabel.setStyle("-fx-text-fill: #666; -fx-font-size: 11px;");
+        
+        // Filter function
+        Runnable applyFilters = () -> {
+            List<Project> filtered = new ArrayList<>(allProjects);
+            
+            // Filter by estimated start date range
+            if (filterStartDatePicker.getValue() != null) {
+                LocalDate centerDate = filterStartDatePicker.getValue();
+                int rangeDays = filterDateRangeSpinner.getValue();
+                LocalDate startRange = centerDate.minusDays(rangeDays);
+                LocalDate endRange = centerDate.plusDays(rangeDays);
+                
+                filtered = filtered.stream()
+                    .filter(p -> !(p.getEndDate().isBefore(startRange) || p.getStartDate().isAfter(endRange)))
+                    .collect(java.util.stream.Collectors.toList());
+            }
+            
+            // Filter by project ID (fuzzy search)
+            String projectIdFilter = filterProjectIdField.getText().trim().toLowerCase();
+            if (!projectIdFilter.isEmpty()) {
+                filtered = filtered.stream()
+                    .filter(p -> p.getProjectId().toLowerCase().contains(projectIdFilter))
+                    .collect(java.util.stream.Collectors.toList());
+            }
+            
+            // Filter by description (fuzzy search)
+            String descriptionFilter = filterDescriptionField.getText().trim().toLowerCase();
+            if (!descriptionFilter.isEmpty()) {
+                filtered = filtered.stream()
+                    .filter(p -> p.getDescription().toLowerCase().contains(descriptionFilter))
+                    .collect(java.util.stream.Collectors.toList());
+            }
+            
+            // Also apply date range filter from the main date pickers
             LocalDate startDate = startDatePicker.getValue();
             LocalDate endDate = endDatePicker.getValue();
+            if (startDate != null && endDate != null) {
+                filtered = filtered.stream()
+                    .filter(p -> !p.getEndDate().isBefore(startDate) && !p.getStartDate().isAfter(endDate))
+                    .collect(java.util.stream.Collectors.toList());
+            }
             
-            // Filter projects that overlap with the date range
-            List<Project> filteredProjects = schedulingService.getAllProjects().stream()
-                .filter(p -> {
-                    // Include project if it overlaps with the selected date range
-                    return !p.getEndDate().isBefore(startDate) && !p.getStartDate().isAfter(endDate);
-                })
-                .sorted((p1, p2) -> p1.getProjectId().compareTo(p2.getProjectId()))
-                .collect(java.util.stream.Collectors.toList());
+            // Update the filtered list
+            filteredProjects.clear();
+            filteredProjects.addAll(filtered);
             
-            projectCombo.getItems().clear();
-            projectCombo.getItems().addAll(filteredProjects);
+            // Update count label
+            projectCountLabel.setText("(" + filtered.size() + " projects)");
+            if (filtered.size() < allProjects.size()) {
+                projectCountLabel.setStyle("-fx-text-fill: #1976d2; -fx-font-size: 11px; -fx-font-weight: bold;");
+            } else {
+                projectCountLabel.setStyle("-fx-text-fill: #666; -fx-font-size: 11px;");
+            }
         };
+        
+        // Set up filter listeners
+        filterStartDatePicker.valueProperty().addListener((obs, oldVal, newVal) -> applyFilters.run());
+        filterDateRangeSpinner.valueProperty().addListener((obs, oldVal, newVal) -> applyFilters.run());
+        filterProjectIdField.textProperty().addListener((obs, oldVal, newVal) -> applyFilters.run());
+        filterDescriptionField.textProperty().addListener((obs, oldVal, newVal) -> applyFilters.run());
+        
+        clearFiltersButton.setOnAction(e -> {
+            filterStartDatePicker.setValue(null);
+            filterDateRangeSpinner.getValueFactory().setValue(15);
+            filterProjectIdField.clear();
+            filterDescriptionField.clear();
+            applyFilters.run();
+        });
+        
+        // Update project list when main date range changes
+        Runnable updateProjectList = () -> applyFilters.run();
         
         // Set up proper string converter for display
         projectCombo.setConverter(new javafx.util.StringConverter<Project>() {
@@ -278,9 +380,39 @@ public class ReportCenterView extends Stage {
             }
         });
         
+        // Create filter section
+        VBox filterSection = new VBox(10);
+        filterSection.setStyle("-fx-background-color: #f5f5f5; -fx-padding: 10; -fx-border-color: #ddd; -fx-border-radius: 5; -fx-background-radius: 5;");
+        
+        Label filterLabel = new Label("Filter Projects:");
+        filterLabel.setStyle("-fx-font-weight: bold;");
+        
+        HBox dateFilterBox = new HBox(10);
+        dateFilterBox.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+        dateFilterBox.getChildren().addAll(
+            new Label("Start Date:"), filterStartDatePicker,
+            new Label("±"), filterDateRangeSpinner, new Label("days")
+        );
+        
+        HBox textFilterBox = new HBox(10);
+        textFilterBox.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+        textFilterBox.getChildren().addAll(
+            new Label("Project ID:"), filterProjectIdField,
+            new Label("Description:"), filterDescriptionField,
+            clearFiltersButton
+        );
+        
+        filterSection.getChildren().addAll(filterLabel, dateFilterBox, textFilterBox);
+        
+        // Project selection with count
+        HBox projectSelectionBox = new HBox(10);
+        projectSelectionBox.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+        projectSelectionBox.getChildren().addAll(projectCombo, projectCountLabel);
+        
         content.getChildren().addAll(
+            filterSection,
             new Label("Select Project for Report:"),
-            projectCombo,
+            projectSelectionBox,
             new Separator(),
             previewContainer
         );

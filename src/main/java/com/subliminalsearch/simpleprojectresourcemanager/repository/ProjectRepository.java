@@ -129,6 +129,44 @@ public class ProjectRepository implements BaseRepository<Project, Long> {
             throw new RuntimeException("Failed to update project", e);
         }
     }
+    
+    public void updateFinancials(Project project) {
+        String sql = """
+            UPDATE projects 
+            SET budget_amount = ?, actual_cost = ?, revenue_amount = ?, 
+                labor_cost = ?, material_cost = ?, travel_cost = ?, other_cost = ?,
+                cost_notes = ?, updated_at = ?
+            WHERE id = ?
+            """;
+        
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            project.setUpdatedAt(LocalDateTime.now());
+            
+            stmt.setDouble(1, project.getBudgetAmount() != null ? project.getBudgetAmount() : 0.0);
+            stmt.setDouble(2, project.getActualCost() != null ? project.getActualCost() : 0.0);
+            stmt.setDouble(3, project.getRevenueAmount() != null ? project.getRevenueAmount() : 0.0);
+            stmt.setDouble(4, project.getLaborCost() != null ? project.getLaborCost() : 0.0);
+            stmt.setDouble(5, project.getMaterialCost() != null ? project.getMaterialCost() : 0.0);
+            stmt.setDouble(6, project.getTravelCost() != null ? project.getTravelCost() : 0.0);
+            stmt.setDouble(7, project.getOtherCost() != null ? project.getOtherCost() : 0.0);
+            stmt.setString(8, project.getCostNotes());
+            stmt.setTimestamp(9, Timestamp.valueOf(project.getUpdatedAt()));
+            stmt.setLong(10, project.getId());
+            
+            int affectedRows = stmt.executeUpdate();
+            if (affectedRows == 0) {
+                throw new SQLException("Updating project financials failed, project not found: " + project.getId());
+            }
+            
+            logger.info("Updated project financials for: {}", project.getProjectId());
+            
+        } catch (SQLException e) {
+            logger.error("Failed to update project financials: {}", project.getId(), e);
+            throw new RuntimeException("Failed to update project financials", e);
+        }
+    }
 
     @Override
     public void delete(Long id) {
