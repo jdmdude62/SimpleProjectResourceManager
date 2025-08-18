@@ -4,12 +4,21 @@ import com.subliminalsearch.simpleprojectresourcemanager.model.Project;
 import com.subliminalsearch.simpleprojectresourcemanager.model.Resource;
 import com.subliminalsearch.simpleprojectresourcemanager.model.Task;
 import com.subliminalsearch.simpleprojectresourcemanager.repository.TaskRepository;
+import javafx.animation.Animation;
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.geometry.Bounds;
 import javafx.geometry.Insets;
+import javafx.geometry.Point2D;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.Scene;
+import javafx.scene.SnapshotParameters;
+import javafx.scene.Group;
+import javafx.scene.image.ImageView;
+import javafx.scene.image.WritableImage;
 import javafx.scene.control.*;
 import javafx.scene.input.*;
 import javafx.scene.layout.*;
@@ -18,6 +27,7 @@ import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
+import javafx.util.Duration;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -34,6 +44,16 @@ public class KanbanBoardView {
     private Map<String, VBox> columnContainers;
     private Map<String, ScrollPane> columnScrollPanes;
     private ObservableList<Task> allTasks;
+    private ScrollPane mainScrollPane;
+    private Timeline autoScrollTimeline;
+    private Map<String, VBox> columnMap = new HashMap<>(); // Maps column name to its VBox container
+    
+    // Mouse-based drag state
+    private Node draggedCard = null;
+    private Task draggedTask = null;
+    private double dragOffsetX, dragOffsetY;
+    private Node dragPreview = null;
+    private String sourceColumn = null;
     
     // Field Service specific columns
     private static final String[] COLUMN_NAMES = {
@@ -83,6 +103,8 @@ public class KanbanBoardView {
         this.columnScrollPanes = new HashMap<>();
         
         initialize();
+        System.out.println("After initialize(), columnMap size: " + columnMap.size());
+        System.out.println("columnMap contents: " + columnMap.keySet());
         loadTasks();
     }
     
@@ -94,7 +116,7 @@ public class KanbanBoardView {
         HBox header = createHeader();
         
         // Kanban columns
-        columnsContainer = new HBox(10);
+        columnsContainer = new HBox(15);  // Increased spacing between columns
         columnsContainer.setFillHeight(true);
         
         for (String columnName : COLUMN_NAMES) {
@@ -103,14 +125,20 @@ public class KanbanBoardView {
         }
         
         // Make columns scrollable horizontally if needed
-        ScrollPane mainScroll = new ScrollPane(columnsContainer);
-        mainScroll.setFitToHeight(true);
-        mainScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
-        mainScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        mainScrollPane = new ScrollPane(columnsContainer);
+        mainScrollPane.setFitToHeight(true);
+        mainScrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        mainScrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        
+        // Setup auto-scroll on drag
+        setupAutoScroll();
+        
+        // Main drop handler disabled - using individual column handlers
+        // setupMainDropHandler();
         
         // Layout
-        VBox.setVgrow(mainScroll, Priority.ALWAYS);
-        root.getChildren().addAll(header, mainScroll);
+        VBox.setVgrow(mainScrollPane, Priority.ALWAYS);
+        root.getChildren().addAll(header, mainScrollPane);
         
         // Scene
         Scene scene = new Scene(root, 1600, 900);
@@ -126,6 +154,301 @@ public class KanbanBoardView {
         stage.setMinWidth(1400);
         stage.setMinHeight(700);
         stage.centerOnScreen();
+        
+        // Cleanup on close
+        stage.setOnHidden(e -> {
+            stopAutoScroll();
+        });
+    }
+    
+    private void setupMainDropHandler() {
+        // Setup a single drop handler on the main container that determines the correct column
+        columnsContainer.setOnDragOver(e -> {
+            if (e.getDragboard().hasString()) {
+                e.acceptTransferModes(TransferMode.MOVE);
+                e.consume();
+            }
+        });
+        
+        columnsContainer.setOnDragDropped(e -> {
+            Dragboard db = e.getDragboard();
+            boolean success = false;
+            
+            if (db.hasString()) {
+                // Find which column the drop occurred in based on coordinates
+                double dropX = e.getX();
+                String targetColumn = null;
+                
+                for (String columnName : COLUMN_NAMES) {
+                    VBox column = columnMap.get(columnName);
+                    if (column != null) {
+                        // Get column bounds in parent coordinates
+                        double columnLeft = column.getLayoutX();
+                        double columnRight = columnLeft + column.getWidth();
+                        
+                        if (dropX >= columnLeft && dropX <= columnRight) {
+                            targetColumn = columnName;
+                            break;
+                        }
+                    }
+                }
+                
+                if (targetColumn != null) {
+                    System.out.println("Drop detected at X=" + dropX + " in column: " + targetColumn);
+                    
+                    try {
+                        Long taskId = Long.parseLong(db.getString());
+                        Task task = allTasks.stream()
+                            .filter(t -> t.getId().equals(taskId))
+                            .findFirst()
+                            .orElse(null);
+                        
+                        if (task != null) {
+                            Task.TaskStatus newStatus = COLUMN_STATUS_MAP.get(targetColumn);
+                            updateTaskStatus(task, newStatus, targetColumn);
+                            success = true;
+                        }
+                    } catch (NumberFormatException ex) {
+                        System.err.println("Invalid task ID: " + db.getString());
+                    }
+                } else {
+                    System.out.println("Drop at X=" + dropX + " - no column found");
+                }
+            }
+            
+            e.setDropCompleted(success);
+            e.consume();
+        });
+    }
+    
+    private void setupAutoScroll() {
+        // Initialize the auto-scroll timeline
+        autoScrollTimeline = new Timeline(new KeyFrame(Duration.millis(30), e -> {
+            // This will be triggered during drag operations
+        }));
+        autoScrollTimeline.setCycleCount(Animation.INDEFINITE);
+        
+        // Setup drag event handlers for auto-scrolling
+        // Use addEventHandler instead of addEventFilter to avoid interfering with drop detection
+        mainScrollPane.addEventHandler(DragEvent.DRAG_OVER, e -> {
+            handleAutoScroll(e);
+            // Don't consume the event so it can propagate to columns
+        });
+        
+        mainScrollPane.addEventHandler(DragEvent.DRAG_EXITED, e -> {
+            stopAutoScroll();
+            // Don't consume the event
+        });
+        
+        // Don't handle DRAG_DROPPED at the ScrollPane level - let columns handle it
+    }
+    
+    private void handleAutoScroll(DragEvent event) {
+        // Get the bounds of the scroll pane
+        Bounds bounds = mainScrollPane.getBoundsInLocal();
+        double x = event.getX();
+        double width = bounds.getWidth();
+        
+        // Define the edge zone for triggering auto-scroll (in pixels)
+        double edgeSize = 150.0;  // Increased from 100 to make it easier to trigger
+        
+        // Calculate dynamic scroll speed based on distance from edge
+        double scrollSpeedBase = 5.0;
+        double maxScrollSpeed = 20.0;
+        
+        // Stop any existing auto-scroll
+        autoScrollTimeline.stop();
+        
+        // Check if we're near the edges
+        if (x < edgeSize) {
+            // Near left edge - scroll left
+            // Speed increases as we get closer to the edge
+            double distanceRatio = (edgeSize - x) / edgeSize;
+            double scrollSpeed = scrollSpeedBase + (maxScrollSpeed - scrollSpeedBase) * distanceRatio;
+            
+            autoScrollTimeline = new Timeline(new KeyFrame(Duration.millis(20), e -> {
+                double currentH = mainScrollPane.getHvalue();
+                double contentWidth = mainScrollPane.getContent().getBoundsInLocal().getWidth();
+                double viewportWidth = mainScrollPane.getViewportBounds().getWidth();
+                double scrollableWidth = contentWidth - viewportWidth;
+                if (scrollableWidth > 0) {
+                    double newH = Math.max(0, currentH - (scrollSpeed / scrollableWidth));
+                    mainScrollPane.setHvalue(newH);
+                }
+            }));
+            autoScrollTimeline.setCycleCount(Animation.INDEFINITE);
+            autoScrollTimeline.play();
+        } else if (x > width - edgeSize) {
+            // Near right edge - scroll right
+            // Speed increases as we get closer to the edge
+            double distanceRatio = (x - (width - edgeSize)) / edgeSize;
+            double scrollSpeed = scrollSpeedBase + (maxScrollSpeed - scrollSpeedBase) * distanceRatio;
+            
+            autoScrollTimeline = new Timeline(new KeyFrame(Duration.millis(20), e -> {
+                double currentH = mainScrollPane.getHvalue();
+                double contentWidth = mainScrollPane.getContent().getBoundsInLocal().getWidth();
+                double viewportWidth = mainScrollPane.getViewportBounds().getWidth();
+                double scrollableWidth = contentWidth - viewportWidth;
+                if (scrollableWidth > 0) {
+                    double newH = Math.min(1.0, currentH + (scrollSpeed / scrollableWidth));
+                    mainScrollPane.setHvalue(newH);
+                }
+            }));
+            autoScrollTimeline.setCycleCount(Animation.INDEFINITE);
+            autoScrollTimeline.play();
+        } else {
+            // Not near edges, stop scrolling
+            stopAutoScroll();
+        }
+    }
+    
+    private void createDragPreview(Node card) {
+        // Make the original card semi-transparent
+        card.setOpacity(0.3);
+        
+        // Create a snapshot of the card
+        SnapshotParameters params = new SnapshotParameters();
+        params.setFill(Color.TRANSPARENT);
+        WritableImage snapshot = card.snapshot(params, null);
+        
+        // Create an ImageView with the snapshot
+        ImageView ghostImage = new ImageView(snapshot);
+        ghostImage.setOpacity(0.7);
+        ghostImage.setMouseTransparent(true); // So it doesn't interfere with mouse events
+        
+        // Create a container for the ghost that can be positioned
+        dragPreview = new Group(ghostImage);
+        dragPreview.setManaged(false); // Don't let it affect layout
+        
+        // Add the ghost to the root of the scene
+        if (stage.getScene() != null && stage.getScene().getRoot() instanceof Pane) {
+            Pane root = (Pane) stage.getScene().getRoot();
+            root.getChildren().add(dragPreview);
+        }
+    }
+    
+    private void removeDragPreview() {
+        // Remove the ghost image
+        if (dragPreview != null && dragPreview.getParent() instanceof Pane) {
+            ((Pane) dragPreview.getParent()).getChildren().remove(dragPreview);
+            dragPreview = null;
+        }
+        
+        // Reset opacity of the dragged card
+        if (draggedCard != null) {
+            draggedCard.setOpacity(1.0);
+        }
+    }
+    
+    private void updateDragPreview(double sceneX, double sceneY) {
+        if (dragPreview != null) {
+            // Position the ghost at the mouse location, offset by the original drag offset
+            dragPreview.setLayoutX(sceneX - dragOffsetX);
+            dragPreview.setLayoutY(sceneY - dragOffsetY);
+        }
+    }
+    
+    private void handleMouseDragAutoScroll(double mouseX) {
+        double viewportWidth = mainScrollPane.getViewportBounds().getWidth();
+        double edgeSize = 100.0;
+        
+        if (mouseX < edgeSize) {
+            // Scroll left
+            if (autoScrollTimeline != null) {
+                autoScrollTimeline.stop();
+            }
+            autoScrollTimeline = new Timeline(new KeyFrame(Duration.millis(20), e -> {
+                double currentH = mainScrollPane.getHvalue();
+                mainScrollPane.setHvalue(Math.max(0, currentH - 0.02));
+            }));
+            autoScrollTimeline.setCycleCount(Animation.INDEFINITE);
+            autoScrollTimeline.play();
+        } else if (mouseX > viewportWidth - edgeSize) {
+            // Scroll right
+            if (autoScrollTimeline != null) {
+                autoScrollTimeline.stop();
+            }
+            autoScrollTimeline = new Timeline(new KeyFrame(Duration.millis(20), e -> {
+                double currentH = mainScrollPane.getHvalue();
+                mainScrollPane.setHvalue(Math.min(1.0, currentH + 0.02));
+            }));
+            autoScrollTimeline.setCycleCount(Animation.INDEFINITE);
+            autoScrollTimeline.play();
+        } else {
+            stopAutoScroll();
+        }
+    }
+    
+    private void highlightTargetColumn(double mouseX) {
+        String targetColumn = findColumnAtPosition(mouseX);
+        clearColumnHighlights();
+        
+        if (targetColumn != null && columnContainers.containsKey(targetColumn)) {
+            VBox container = columnContainers.get(targetColumn);
+            container.setStyle(container.getStyle() + "; -fx-background-color: #e0f0ff;");
+        }
+    }
+    
+    private void highlightTargetColumnDirect(double containerX) {
+        clearColumnHighlights();
+        
+        // Find column directly using container coordinates
+        for (String columnName : COLUMN_NAMES) {
+            VBox column = columnMap.get(columnName);
+            if (column != null) {
+                Bounds bounds = column.getBoundsInParent();
+                if (containerX >= bounds.getMinX() && containerX <= bounds.getMaxX()) {
+                    VBox container = columnContainers.get(columnName);
+                    if (container != null) {
+                        container.setStyle(container.getStyle() + "; -fx-background-color: #e0f0ff;");
+                    }
+                    break;
+                }
+            }
+        }
+    }
+    
+    private void clearColumnHighlights() {
+        for (VBox container : columnContainers.values()) {
+            container.setStyle(container.getStyle().replace("; -fx-background-color: #e0f0ff;", ""));
+        }
+    }
+    
+    private String findColumnAtPosition(double x) {
+        // Adjust x for scroll position
+        double scrollX = x + mainScrollPane.getHvalue() * 
+            (columnsContainer.getWidth() - mainScrollPane.getViewportBounds().getWidth());
+        
+        System.out.println("=== findColumnAtPosition Debug ===");
+        System.out.println("Input X: " + x);
+        System.out.println("Scroll H-value: " + mainScrollPane.getHvalue());
+        System.out.println("Container width: " + columnsContainer.getWidth());
+        System.out.println("Viewport width: " + mainScrollPane.getViewportBounds().getWidth());
+        System.out.println("Adjusted scrollX: " + scrollX);
+        System.out.println("columnMap size: " + columnMap.size());
+        System.out.println("columnMap keys: " + columnMap.keySet());
+        
+        for (String columnName : COLUMN_NAMES) {
+            VBox column = columnMap.get(columnName);
+            if (column != null) {
+                Bounds bounds = column.getBoundsInParent();
+                System.out.println("Column " + columnName + " bounds: " + bounds.getMinX() + " - " + bounds.getMaxX());
+                if (scrollX >= bounds.getMinX() && scrollX <= bounds.getMaxX()) {
+                    System.out.println("==> FOUND COLUMN: " + columnName);
+                    return columnName;
+                }
+            } else {
+                System.out.println("Column " + columnName + " not found in columnMap!");
+            }
+        }
+        System.out.println("==> NO COLUMN FOUND");
+        return null;
+    }
+    
+    private void stopAutoScroll() {
+        if (autoScrollTimeline != null) {
+            autoScrollTimeline.stop();
+        }
     }
     
     private HBox createHeader() {
@@ -156,19 +479,26 @@ public class KanbanBoardView {
         Button listViewBtn = new Button("📋 List View");
         listViewBtn.setOnAction(e -> switchToListView());
         
-        Button statsBtn = new Button("📊 Statistics");
+        Button ganttBtn = new Button("📊 Gantt Chart");
+        ganttBtn.setOnAction(e -> showGanttChart());
+        
+        Button statsBtn = new Button("📈 Statistics");
         statsBtn.setOnAction(e -> showStatistics());
         
-        header.getChildren().addAll(projectInfo, spacer, refreshBtn, filterBtn, listViewBtn, statsBtn);
+        header.getChildren().addAll(projectInfo, spacer, refreshBtn, filterBtn, listViewBtn, ganttBtn, statsBtn);
         return header;
     }
     
     private VBox createKanbanColumn(String columnName) {
         VBox column = new VBox(10);
-        column.setMinWidth(200);
-        column.setPrefWidth(250);
-        column.setMaxWidth(300);
+        column.setMinWidth(220);  // Increased minimum width
+        column.setPrefWidth(260);  // Increased preferred width
+        column.setMaxWidth(320);  // Increased maximum width
         column.setStyle("-fx-background-color: #f8f8f8; -fx-background-radius: 5; -fx-padding: 10;");
+        
+        // Store the column for later reference
+        columnMap.put(columnName, column);
+        System.out.println("Registered column '" + columnName + "' in columnMap");
         
         // Column header
         HBox columnHeader = new HBox(10);
@@ -183,24 +513,62 @@ public class KanbanBoardView {
         
         columnHeader.getChildren().addAll(titleLabel, countLabel);
         
-        // Task container
+        // Task container - make it scrollable within itself
+        ScrollPane scrollPane = new ScrollPane();
         VBox taskContainer = new VBox(8);
         taskContainer.setStyle("-fx-padding: 5;");
-        taskContainer.setMinHeight(650); // Ensure minimum height for drop zone
-        columnContainers.put(columnName, taskContainer);
+        taskContainer.setMinHeight(650);
+        taskContainer.setPrefHeight(Region.USE_COMPUTED_SIZE);
+        taskContainer.setFillWidth(true);
+        taskContainer.setMaxHeight(Double.MAX_VALUE);
         
-        // Make task container scrollable
-        ScrollPane scrollPane = new ScrollPane(taskContainer);
+        scrollPane.setContent(taskContainer);
         scrollPane.setFitToWidth(true);
         scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
         scrollPane.setPrefHeight(700);
         scrollPane.setMinHeight(650);
-        columnScrollPanes.put(columnName, scrollPane);
+        scrollPane.setMaxHeight(Double.MAX_VALUE);
         
-        // Setup drag and drop for BOTH the container and the scroll pane
-        setupColumnDragAndDrop(taskContainer, columnName);
-        setupColumnDragAndDrop(scrollPane, columnName);
+        columnContainers.put(columnName, taskContainer);
+        columnScrollPanes.put(columnName, scrollPane);
+        System.out.println("Registered containers for column '" + columnName + "'");
+        
+        // Setup drop handling directly on each column's scroll pane
+        scrollPane.setOnDragOver(e -> {
+            if (e.getDragboard().hasString()) {
+                e.acceptTransferModes(TransferMode.MOVE);
+            }
+            e.consume();
+        });
+        
+        scrollPane.setOnDragDropped(e -> {
+            Dragboard db = e.getDragboard();
+            boolean success = false;
+            
+            if (db.hasString()) {
+                try {
+                    Long taskId = Long.parseLong(db.getString());
+                    System.out.println("Direct drop in column: " + columnName);
+                    
+                    Task task = allTasks.stream()
+                        .filter(t -> t.getId().equals(taskId))
+                        .findFirst()
+                        .orElse(null);
+                    
+                    if (task != null) {
+                        Task.TaskStatus newStatus = COLUMN_STATUS_MAP.get(columnName);
+                        updateTaskStatus(task, newStatus, columnName);
+                        success = true;
+                    }
+                } catch (NumberFormatException ex) {
+                    System.err.println("Invalid task ID: " + db.getString());
+                }
+            }
+            
+            e.setDropCompleted(success);
+            e.consume();
+        });
         
         VBox.setVgrow(scrollPane, Priority.ALWAYS);
         column.getChildren().addAll(columnHeader, scrollPane);
@@ -386,32 +754,125 @@ public class KanbanBoardView {
     }
     
     private void setupCardDragAndDrop(Node card) {
-        card.setOnDragDetected(e -> {
+        // Mouse-based drag implementation
+        card.setOnMousePressed(e -> {
             if (e.getButton() == MouseButton.PRIMARY) {
-                Task task = (Task) card.getUserData();
-                System.out.println("Starting drag for task: " + task.getTitle() + " (ID: " + task.getId() + ")");
+                draggedCard = card;
+                draggedTask = (Task) card.getUserData();
+                dragOffsetX = e.getX();
+                dragOffsetY = e.getY();
                 
-                Dragboard db = card.startDragAndDrop(TransferMode.MOVE);
-                ClipboardContent content = new ClipboardContent();
-                content.putString(task.getId().toString());
-                db.setContent(content);
+                // Find source column
+                sourceColumn = null;
+                for (Map.Entry<String, VBox> entry : columnContainers.entrySet()) {
+                    if (entry.getValue().getChildren().contains(card)) {
+                        sourceColumn = entry.getKey();
+                        System.out.println("Found card in columnContainers: " + entry.getKey());
+                        break;
+                    }
+                }
                 
-                // Add visual feedback
-                card.setOpacity(0.5);
-                db.setDragView(card.snapshot(null, null));
+                // If not found in columnContainers, might be in a different state
+                if (sourceColumn == null) {
+                    System.out.println("WARNING: Card not found in any columnContainer!");
+                    // Try to determine from task status
+                    sourceColumn = determineColumn(draggedTask);
+                    System.out.println("Determined source column from task: " + sourceColumn);
+                }
+                
+                System.out.println("Mouse pressed on task: " + draggedTask.getTitle() + " in column: " + sourceColumn);
+                
+                // Create drag preview
+                createDragPreview(card);
                 
                 e.consume();
             }
         });
         
-        card.setOnDragDone(e -> {
-            // Reset visual feedback
-            card.setOpacity(1.0);
-            e.consume();
+        card.setOnMouseDragged(e -> {
+            if (draggedCard != null) {
+                // Get mouse position relative to scroll pane for auto-scroll
+                Point2D localPoint = mainScrollPane.sceneToLocal(e.getSceneX(), e.getSceneY());
+                
+                // Get mouse position relative to columns container for column detection
+                Point2D containerPoint = columnsContainer.sceneToLocal(e.getSceneX(), e.getSceneY());
+                
+                System.out.println("Mouse dragged - Scene: (" + e.getSceneX() + ", " + e.getSceneY() + 
+                                   ") ScrollPane: (" + localPoint.getX() + ", " + localPoint.getY() + 
+                                   ") Container: (" + containerPoint.getX() + ", " + containerPoint.getY() + ")");
+                
+                // Update ghost position to follow mouse
+                updateDragPreview(e.getSceneX(), e.getSceneY());
+                
+                // Handle auto-scroll using scroll pane coordinates
+                handleMouseDragAutoScroll(localPoint.getX());
+                
+                // Highlight target column using container coordinates
+                highlightTargetColumnDirect(containerPoint.getX());
+                
+                e.consume();
+            }
+        });
+        
+        card.setOnMouseReleased(e -> {
+            if (draggedCard != null) {
+                // Use a different approach - convert to columnsContainer coordinates
+                Point2D scenePoint = new Point2D(e.getSceneX(), e.getSceneY());
+                Point2D containerPoint = columnsContainer.sceneToLocal(scenePoint);
+                
+                System.out.println("\n=== MOUSE RELEASED ===");
+                System.out.println("Scene coordinates: (" + e.getSceneX() + ", " + e.getSceneY() + ")");
+                System.out.println("Container coordinates: (" + containerPoint.getX() + ", " + containerPoint.getY() + ")");
+                System.out.println("Source column: " + sourceColumn);
+                
+                // Find column directly using container coordinates
+                String targetColumn = null;
+                for (String columnName : COLUMN_NAMES) {
+                    VBox column = columnMap.get(columnName);
+                    if (column != null) {
+                        Bounds bounds = column.getBoundsInParent();
+                        System.out.println("Checking " + columnName + " bounds: " + bounds.getMinX() + " - " + bounds.getMaxX() + " against X: " + containerPoint.getX());
+                        if (containerPoint.getX() >= bounds.getMinX() && containerPoint.getX() <= bounds.getMaxX()) {
+                            targetColumn = columnName;
+                            System.out.println("==> DROP TARGET: " + columnName);
+                            break;
+                        }
+                    }
+                }
+                
+                System.out.println("Target column found: " + targetColumn);
+                System.out.println("Source column is: " + sourceColumn);
+                System.out.println("Columns are equal? " + (targetColumn != null && targetColumn.equals(sourceColumn)));
+                System.out.println("Columns are different? " + (targetColumn != null && !targetColumn.equals(sourceColumn)));
+                
+                if (targetColumn != null && !targetColumn.equals(sourceColumn)) {
+                    System.out.println("ATTEMPTING TO DROP - Task: " + draggedTask.getTitle() + " from " + sourceColumn + " to " + targetColumn);
+                    Task.TaskStatus newStatus = COLUMN_STATUS_MAP.get(targetColumn);
+                    System.out.println("New status will be: " + newStatus);
+                    updateTaskStatus(draggedTask, newStatus, targetColumn);
+                } else {
+                    System.out.println("DROP CANCELLED - Target: " + targetColumn + ", Source: " + sourceColumn);
+                }
+                
+                // Clean up
+                removeDragPreview();
+                clearColumnHighlights();
+                draggedCard = null;
+                draggedTask = null;
+                sourceColumn = null;
+                stopAutoScroll();
+                
+                e.consume();
+            }
         });
     }
     
+    private String currentDropTarget = null;
+    
     private void setupColumnDragAndDrop(Node container, String columnName) {
+        // Get the actual task container (VBox) from the ScrollPane
+        VBox taskContainer = columnContainers.get(columnName);
+        
         container.setOnDragOver(e -> {
             if (e.getDragboard().hasString()) {
                 e.acceptTransferModes(TransferMode.MOVE);
@@ -422,14 +883,10 @@ public class KanbanBoardView {
         container.setOnDragEntered(e -> {
             if (e.getDragboard().hasString()) {
                 System.out.println("Drag entered column: " + columnName);
-                // Visual feedback for the column
-                if (container instanceof VBox) {
-                    container.setStyle(container.getStyle() + "; -fx-background-color: #e0f0ff;");
-                } else if (container instanceof ScrollPane) {
-                    Node content = ((ScrollPane) container).getContent();
-                    if (content != null) {
-                        content.setStyle(content.getStyle() + "; -fx-background-color: #e0f0ff;");
-                    }
+                currentDropTarget = columnName;
+                // Visual feedback - highlight the task container
+                if (taskContainer != null && !taskContainer.getStyle().contains("#e0f0ff")) {
+                    taskContainer.setStyle(taskContainer.getStyle() + "; -fx-background-color: #e0f0ff;");
                 }
                 e.consume();
             }
@@ -438,19 +895,24 @@ public class KanbanBoardView {
         container.setOnDragExited(e -> {
             System.out.println("Drag exited column: " + columnName);
             // Reset visual feedback
-            if (container instanceof VBox) {
-                container.setStyle(container.getStyle().replace("; -fx-background-color: #e0f0ff;", ""));
-            } else if (container instanceof ScrollPane) {
-                Node content = ((ScrollPane) container).getContent();
-                if (content != null) {
-                    content.setStyle(content.getStyle().replace("; -fx-background-color: #e0f0ff;", ""));
-                }
+            if (taskContainer != null) {
+                taskContainer.setStyle(taskContainer.getStyle().replace("; -fx-background-color: #e0f0ff;", ""));
             }
             e.consume();
         });
         
         container.setOnDragDropped(e -> {
             System.out.println("Drop detected in column: " + columnName);
+            System.out.println("  Dragboard has string: " + e.getDragboard().hasString());
+            
+            // Always process the drop if we have a valid dragboard
+            if (!e.getDragboard().hasString()) {
+                System.out.println("  No string in dragboard, rejecting drop");
+                e.setDropCompleted(false);
+                e.consume();
+                return;
+            }
+            
             Dragboard db = e.getDragboard();
             boolean success = false;
             
@@ -480,27 +942,37 @@ public class KanbanBoardView {
             
             e.setDropCompleted(success);
             e.consume();
+            
+            // Clear the drop target after handling
+            currentDropTarget = null;
         });
     }
     
     private void updateTaskStatus(Task task, Task.TaskStatus newStatus, String columnName) {
         Task.TaskStatus oldStatus = task.getStatus();
-        System.out.println("Updating task '" + task.getTitle() + "' from status " + oldStatus + " to column " + columnName);
+        System.out.println("\n=== updateTaskStatus Called ===");
+        System.out.println("Task: '" + task.getTitle() + "'");
+        System.out.println("Task ID: " + task.getId());
+        System.out.println("Old status: " + oldStatus);
+        System.out.println("New status requested: " + newStatus);
+        System.out.println("Target column: " + columnName);
         
         // Validation rules
         if (!validateStatusTransition(task, oldStatus, newStatus, columnName)) {
-            System.out.println("Validation failed for transition");
+            System.out.println("VALIDATION FAILED - Status transition not allowed");
             return;
         }
         
         // Update task based on new column
         task.setStatus(newStatus);
-        System.out.println("New status will be: " + newStatus);
+        System.out.println("Status updated to: " + newStatus);
         
         // Field service specific updates
         switch (columnName) {
             case "Backlog":
                 // Moving back to backlog - clean up all markers
+                System.out.println("Moving to BACKLOG - cleaning all markers");
+                System.out.println("Before: RiskNotes = " + task.getRiskNotes());
                 if (task.getRiskNotes() != null) {
                     String cleanNotes = task.getRiskNotes()
                         .replace("[Ready]", "")
@@ -513,30 +985,42 @@ public class KanbanBoardView {
                     }
                     task.setRiskNotes(cleanNotes.trim().isEmpty() ? null : cleanNotes.trim());
                 }
+                System.out.println("After: RiskNotes = " + task.getRiskNotes());
                 task.setStatus(Task.TaskStatus.NOT_STARTED);
                 task.setProgressPercentage(0);
                 break;
                 
             case "Ready":
                 // Task is ready to be worked on
-                // Add marker to keep it in Ready column
+                // Clean up OnSite marker and add Ready marker
                 String notes = task.getRiskNotes() != null ? task.getRiskNotes() : "";
+                notes = notes.replace("[OnSite]", "").trim();
                 if (!notes.contains("[Ready]")) {
-                    task.setRiskNotes(notes + " [Ready]");
+                    notes = (notes + " [Ready]").trim();
                 }
+                task.setRiskNotes(notes);
+                task.setStatus(Task.TaskStatus.NOT_STARTED); // Explicitly set status
                 break;
                 
             case "In Progress":
-                // Remove Ready marker if present
+                // Remove Ready and OnSite markers if present
                 if (task.getRiskNotes() != null) {
-                    task.setRiskNotes(task.getRiskNotes().replace("[Ready]", "").trim());
+                    String cleanedNotes = task.getRiskNotes()
+                        .replace("[Ready]", "")
+                        .replace("[OnSite]", "")
+                        .trim();
+                    task.setRiskNotes(cleanedNotes.isEmpty() ? null : cleanedNotes);
                 }
                 if (task.getActualStart() == null) {
                     task.setActualStart(LocalDate.now());
                 }
-                if (task.getProgressPercentage() == 0) {
+                // Set progress to a range that keeps it in "In Progress" (not 0, but less than 90)
+                if (task.getProgressPercentage() == 0 || task.getProgressPercentage() >= 90) {
                     task.setProgressPercentage(25);
                 }
+                // Clear location to prevent auto-routing to "On Site"
+                task.setLocation(null);
+                task.setStatus(Task.TaskStatus.IN_PROGRESS);
                 break;
                 
             case "On Site":
@@ -545,11 +1029,13 @@ public class KanbanBoardView {
                 if (task.getProgressPercentage() < 50) {
                     task.setProgressPercentage(50);
                 }
-                // Add marker for on site
+                // Remove Ready marker and add OnSite marker
                 String onSiteNotes = task.getRiskNotes() != null ? task.getRiskNotes() : "";
+                onSiteNotes = onSiteNotes.replace("[Ready]", "").trim();
                 if (!onSiteNotes.contains("[OnSite]")) {
-                    task.setRiskNotes(onSiteNotes + " [OnSite]");
+                    onSiteNotes = (onSiteNotes + " [OnSite]").trim();
                 }
+                task.setRiskNotes(onSiteNotes);
                 break;
                 
             case "Awaiting Materials":
@@ -586,7 +1072,15 @@ public class KanbanBoardView {
         }
         
         // Save to database
+        System.out.println("Saving to database - Task: " + task.getTitle());
+        System.out.println("  Final Status: " + task.getStatus());
+        System.out.println("  Final RiskNotes: " + task.getRiskNotes());
         taskRepository.update(task);
+        
+        // Verify the save
+        taskRepository.findById(task.getId()).ifPresent(verifyTask -> {
+            System.out.println("Verified from DB - Status: " + verifyTask.getStatus() + ", RiskNotes: " + verifyTask.getRiskNotes());
+        });
         
         // Refresh the board
         loadTasks();
@@ -628,7 +1122,9 @@ public class KanbanBoardView {
     }
     
     private void loadTasks() {
+        System.out.println("\n=== loadTasks() called ===");
         allTasks = FXCollections.observableArrayList(taskRepository.findByProjectId(project.getId()));
+        System.out.println("Loaded " + allTasks.size() + " tasks from database");
         
         // Clear all columns
         for (VBox container : columnContainers.values()) {
@@ -679,8 +1175,13 @@ public class KanbanBoardView {
     }
     
     private String determineColumn(Task task) {
+        System.out.println("determineColumn for task: " + task.getTitle());
+        System.out.println("  Status: " + task.getStatus());
+        System.out.println("  RiskNotes: " + task.getRiskNotes());
+        
         // Map tasks to appropriate columns based on status and metadata
         if (task.getStatus() == null) {
+            System.out.println("  -> Backlog (null status)");
             return "Backlog";
         }
         
@@ -690,43 +1191,52 @@ public class KanbanBoardView {
             if (task.getRiskNotes() != null) {
                 String notes = task.getRiskNotes().toLowerCase();
                 if (notes.contains("weather hold:") || notes.contains("[weather]")) {
+                    System.out.println("  -> Weather Hold");
                     return "Weather Hold";
                 } else if (notes.contains("awaiting materials:") || notes.contains("[materials]")) {
+                    System.out.println("  -> Awaiting Materials");
                     return "Awaiting Materials";
                 } else if (task.getRiskNotes().contains("[Ready]")) {
                     // Special marker to keep in Ready column despite BLOCKED status
+                    System.out.println("  -> Ready (has [Ready] marker with BLOCKED)");
                     return "Ready";
                 }
             }
+            System.out.println("  -> Blocked");
             return "Blocked";
         }
         
         switch (task.getStatus()) {
             case NOT_STARTED:
-                // Check for Ready marker in notes or if start date is today/past
+                // Check for Ready marker in notes ONLY - don't auto-move based on dates
                 if (task.getRiskNotes() != null && task.getRiskNotes().contains("[Ready]")) {
+                    System.out.println("  -> Ready (has [Ready] marker)");
                     return "Ready";
                 }
-                if (task.getPlannedStart() != null && 
-                    !task.getPlannedStart().isAfter(LocalDate.now())) {
-                    return "Ready";
-                }
+                // Removed automatic date-based Ready placement to allow manual control
+                System.out.println("  -> Backlog (NOT_STARTED, no [Ready] marker)");
                 return "Backlog";
                 
             case IN_PROGRESS:
                 // Check for special markers
                 if (task.getRiskNotes() != null && task.getRiskNotes().contains("[OnSite]")) {
+                    System.out.println("  -> On Site (has [OnSite] marker)");
                     return "On Site";
                 }
                 // Check for review status
+                System.out.println("  Progress: " + task.getProgressPercentage() + "%");
                 if (task.getProgressPercentage() >= 90) {
+                    System.out.println("  -> In Review (progress >= 90%)");
                     return "In Review";
                 }
                 // Check if on site (could use location or custom field)
+                System.out.println("  Location: " + task.getLocation());
                 if (task.getLocation() != null && !task.getLocation().isEmpty() &&
                     task.getProgressPercentage() >= 50) {
+                    System.out.println("  -> On Site (has location and progress >= 50%)");
                     return "On Site";
                 }
+                System.out.println("  -> In Progress");
                 return "In Progress";
                 
             case REVIEW:
@@ -891,6 +1401,12 @@ public class KanbanBoardView {
     private void switchToListView() {
         // Close kanban and open list view
         stage.close();
+    }
+    
+    private void showGanttChart() {
+        // Open Gantt Chart view
+        GanttChartView ganttChart = new GanttChartView(project, taskRepository, resources);
+        ganttChart.show();
     }
     
     private void showStatistics() {

@@ -1,0 +1,83 @@
+/* Gantt Chart Styles */
+
+.gantt-chart {
+    -fx-background-color: #ffffff;
+}
+
+.gantt-header {
+    -fx-background-color: #f5f5f5;
+    -fx-border-color: #ddd;
+    -fx-border-width: 0 0 1 0;
+}
+
+.gantt-task-list {
+    -fx-background-color: #ffffff;
+    -fx-border-color: #ddd;
+    -fx-border-width: 0 1 0 0;
+}
+
+.gantt-task-row {
+    -fx-padding: 5 10 5 10;
+    -fx-border-color: transparent transparent #eee transparent;
+    -fx-border-width: 0 0 1 0;
+}
+
+.gantt-task-row:hover {
+    -fx-background-color: #f0f8ff;
+}
+
+.gantt-task-bar {
+    -fx-cursor: hand;
+}
+
+.gantt-task-bar:hover {
+    -fx-opacity: 0.8;
+}
+
+.gantt-milestone {
+    -fx-cursor: hand;
+}
+
+.gantt-dependency-line {
+    -fx-stroke: #7F8C8D;
+    -fx-stroke-width: 1.5;
+}
+
+.gantt-critical-path {
+    -fx-fill: #E74C3C;
+}
+
+.gantt-progress-bar {
+    -fx-fill: #2ECC71;
+    -fx-opacity: 0.7;
+}
+
+.gantt-today-line {
+    -fx-stroke: #E67E22;
+    -fx-stroke-width: 2;
+    -fx-stroke-dash-array: 5 5;
+}
+
+.gantt-weekend {
+    -fx-fill: #ECF0F1;
+    -fx-opacity: 0.3;
+}
+
+.gantt-grid-line {
+    -fx-stroke: #BDC3C7;
+    -fx-stroke-width: 0.5;
+    -fx-opacity: 0.5;
+}
+
+.gantt-toolbar {
+    -fx-background-color: #f5f5f5;
+    -fx-padding: 10;
+    -fx-spacing: 10;
+}
+
+.gantt-status-bar {
+    -fx-background-color: #f5f5f5;
+    -fx-padding: 5;
+    -fx-border-color: #ddd;
+    -fx-border-width: 1 0 0 0;
+}

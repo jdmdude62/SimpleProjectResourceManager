@@ -363,12 +363,36 @@ public class DashboardView {
                 Collectors.counting()
             ));
         
-        priorityCounts.forEach((priority, count) -> {
-            series.getData().add(new XYChart.Data<>(priority.toString(), count));
-        });
-        
-        barChart.getData().add(series);
+        // Add chart to card first
         card.getChildren().add(barChart);
+        
+        // Delay adding data to avoid JavaFX compatibility issues
+        javafx.application.Platform.runLater(() -> {
+            try {
+                for (Map.Entry<Task.TaskPriority, Long> entry : priorityCounts.entrySet()) {
+                    XYChart.Data<String, Number> data = new XYChart.Data<>(entry.getKey().toString(), entry.getValue());
+                    series.getData().add(data);
+                }
+                barChart.getData().clear();
+                barChart.getData().add(series);
+            } catch (Exception e) {
+                System.err.println("Error adding data to priority chart: " + e.getMessage());
+                // Remove chart and add fallback
+                card.getChildren().clear();
+                Label titleLabel = new Label("Task Priority Breakdown");
+                titleLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
+                card.getChildren().add(titleLabel);
+                
+                VBox fallback = new VBox(5);
+                fallback.setPadding(new Insets(10));
+                for (Map.Entry<Task.TaskPriority, Long> entry : priorityCounts.entrySet()) {
+                    Label label = new Label(entry.getKey() + ": " + entry.getValue() + " tasks");
+                    label.setStyle("-fx-font-size: 14px;");
+                    fallback.getChildren().add(label);
+                }
+                card.getChildren().add(fallback);
+            }
+        });
         
         return card;
     }
@@ -645,5 +669,18 @@ public class DashboardView {
     public void show() {
         stage.show();
         stage.centerOnScreen();
+        stage.toFront();
+        stage.requestFocus();
+        // Temporarily set always on top to ensure it appears above the Task List
+        stage.setAlwaysOnTop(true);
+        // Remove always on top after a short delay
+        javafx.application.Platform.runLater(() -> {
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                // Ignore
+            }
+            javafx.application.Platform.runLater(() -> stage.setAlwaysOnTop(false));
+        });
     }
 }

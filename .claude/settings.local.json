@@ -46,9 +46,12 @@
       "Bash(powershell:*)",
       "Bash(./run-tests-with-prod-db.cmd -Dtest=*ResourceUnavailabilityRepositoryIntegrationTest)",
       "Bash(./run-tests-with-prod-db.cmd:*)",
-      "Bash(compile.cmd)"
+      "Bash(compile.cmd)",
+      "Bash(cls)",
+      "WebSearch"
     ],
     "deny": [],
-    "ask": []
+    "ask": [],
+    "defaultMode": "acceptEdits"
   }
 }

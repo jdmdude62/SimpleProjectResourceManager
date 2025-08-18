@@ -9,6 +9,8 @@ import com.subliminalsearch.simpleprojectresourcemanager.repository.ResourceRepo
 import com.subliminalsearch.simpleprojectresourcemanager.repository.TaskRepository;
 import com.subliminalsearch.simpleprojectresourcemanager.service.SchedulingService;
 import com.subliminalsearch.simpleprojectresourcemanager.view.CriticalPathView;
+import com.subliminalsearch.simpleprojectresourcemanager.view.DashboardView;
+import com.subliminalsearch.simpleprojectresourcemanager.view.GanttChartView;
 import com.subliminalsearch.simpleprojectresourcemanager.view.MapView;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
@@ -216,6 +218,10 @@ public class TaskListView {
         kanbanBtn.setStyle("-fx-font-size: 14px;");
         kanbanBtn.setOnAction(e -> openKanbanView());
         
+        Button ganttBtn = new Button("📊 Gantt Chart");
+        ganttBtn.setStyle("-fx-font-size: 14px;");
+        ganttBtn.setOnAction(e -> openGanttChart());
+        
         Button timelineBtn = new Button("📅 Timeline");
         timelineBtn.setStyle("-fx-font-size: 14px;");
         timelineBtn.setOnAction(e -> openTimelineView());
@@ -253,7 +259,7 @@ public class TaskListView {
         exportBtn.setStyle("-fx-font-size: 14px;");
         exportBtn.setDisable(true); // Will implement later
         
-        header.getChildren().addAll(projectInfo, spacer, dashboardBtn, listViewBtn, kanbanBtn, 
+        header.getChildren().addAll(projectInfo, spacer, dashboardBtn, listViewBtn, kanbanBtn, ganttBtn,
                                   timelineBtn, calendarBtn, criticalPathBtn, mapBtn, 
                                   new Separator(Orientation.VERTICAL),
                                   addTaskBtn, addSubtaskBtn, manageDepsBtn, refreshBtn, exportBtn);
@@ -1070,6 +1076,11 @@ public class TaskListView {
         // stage.close();
     }
     
+    private void openGanttChart() {
+        GanttChartView ganttView = new GanttChartView(project, taskRepository, resources);
+        ganttView.show();
+    }
+    
     private void openTimelineView() {
         ResourceTimelineView timelineView = new ResourceTimelineView(project, taskRepository, resourceRepository);
         timelineView.show();
@@ -1086,8 +1097,20 @@ public class TaskListView {
     }
     
     private void openDashboardView() {
-        DashboardView dashboardView = new DashboardView(project, taskRepository, resourceRepository);
-        dashboardView.show();
+        try {
+            DashboardView dashboardView = new DashboardView(project, taskRepository, resourceRepository);
+            dashboardView.show();
+        } catch (Exception e) {
+            System.err.println("Error opening Dashboard: " + e.getMessage());
+            e.printStackTrace();
+            
+            // Show error dialog
+            Alert alert = new Alert(Alert.AlertType.ERROR);
+            alert.setTitle("Dashboard Error");
+            alert.setHeaderText("Unable to open Dashboard");
+            alert.setContentText("There was an error opening the Dashboard view. This may be due to a JavaFX compatibility issue.\n\nError: " + e.getMessage());
+            alert.showAndWait();
+        }
     }
     
     private void openMapView() {
