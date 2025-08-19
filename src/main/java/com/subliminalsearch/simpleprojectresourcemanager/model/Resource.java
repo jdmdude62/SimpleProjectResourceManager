@@ -11,6 +11,11 @@ public class Resource {
     private ResourceType resourceType;
     private boolean isActive;
     private LocalDateTime createdAt;
+    
+    // LDAP/AD integration fields
+    private String ldapUsername;     // AD sAMAccountName
+    private String department;
+    private String skillLevel;
 
     public Resource() {
         this.isActive = true;
@@ -78,6 +83,40 @@ public class Resource {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+    
+    // LDAP/AD getters and setters
+    public String getLdapUsername() {
+        return ldapUsername;
+    }
+    
+    public void setLdapUsername(String ldapUsername) {
+        this.ldapUsername = ldapUsername;
+    }
+    
+    public String getDepartment() {
+        return department;
+    }
+    
+    public void setDepartment(String department) {
+        this.department = department;
+    }
+    
+    public String getSkillLevel() {
+        return skillLevel;
+    }
+    
+    public void setSkillLevel(String skillLevel) {
+        this.skillLevel = skillLevel;
+    }
+    
+    // Convenience method for ResourceName used in other services
+    public String getResourceName() {
+        return name;
+    }
+    
+    public void setResourceName(String resourceName) {
+        this.name = resourceName;
     }
 
     public ResourceCategory getCategory() {

@@ -257,7 +257,7 @@ public class TaskListView {
         
         Button exportBtn = new Button("📤 Export");
         exportBtn.setStyle("-fx-font-size: 14px;");
-        exportBtn.setDisable(true); // Will implement later
+        exportBtn.setOnAction(e -> openExportDialog());
         
         header.getChildren().addAll(projectInfo, spacer, dashboardBtn, listViewBtn, kanbanBtn, ganttBtn,
                                   timelineBtn, calendarBtn, criticalPathBtn, mapBtn, 

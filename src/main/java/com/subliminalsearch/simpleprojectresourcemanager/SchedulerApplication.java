@@ -8,6 +8,8 @@ import com.subliminalsearch.simpleprojectresourcemanager.repository.ProjectManag
 import com.subliminalsearch.simpleprojectresourcemanager.repository.ProjectRepository;
 import com.subliminalsearch.simpleprojectresourcemanager.repository.ResourceRepository;
 import com.subliminalsearch.simpleprojectresourcemanager.service.SchedulingService;
+import com.subliminalsearch.simpleprojectresourcemanager.service.SessionManager;
+import com.subliminalsearch.simpleprojectresourcemanager.view.LoginView;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
@@ -25,6 +27,9 @@ public class SchedulerApplication extends Application {
     private DatabaseConfig databaseConfig;
     private SchedulingService schedulingService;
     private MainController mainController;
+    private SessionManager sessionManager;
+    private Stage primaryStage;
+    private boolean useAuthentication = true; // Set to false to bypass login during development
 
     @Override
     public void init() throws Exception {
@@ -56,7 +61,54 @@ public class SchedulerApplication extends Application {
     @Override
     public void start(Stage stage) throws IOException {
         logger.info("Starting JavaFX application...");
+        this.primaryStage = stage;
         
+        // Initialize session manager
+        sessionManager = SessionManager.getInstance();
+        sessionManager.setOnSessionExpired(() -> {
+            Platform.runLater(() -> {
+                primaryStage.close();
+                showLoginScreen();
+            });
+        });
+        
+        // Check if we should use authentication
+        String authMode = System.getProperty("auth.mode", "ldap");
+        useAuthentication = !"bypass".equalsIgnoreCase(authMode);
+        
+        if (useAuthentication) {
+            // Show login screen first
+            showLoginScreen();
+        } else {
+            // Bypass login for development
+            logger.info("Authentication bypassed for development");
+            showMainApplication();
+        }
+    }
+    
+    private void showLoginScreen() {
+        LoginView loginView = new LoginView(new Stage());
+        
+        // Set callback for successful login
+        loginView.setOnSuccessfulLogin(() -> {
+            Platform.runLater(() -> {
+                try {
+                    showMainApplication();
+                } catch (IOException e) {
+                    logger.error("Error loading main application", e);
+                }
+            });
+        });
+        
+        // Enable test mode if in development
+        if (System.getProperty("dev.mode", "false").equals("true")) {
+            loginView.enableTestMode();
+        }
+        
+        loginView.show();
+    }
+    
+    private void showMainApplication() throws IOException {
         FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("/fxml/main-view.fxml"));
         
         // Create and inject the main controller
@@ -71,17 +123,34 @@ public class SchedulerApplication extends Application {
         // Add custom CSS
         scene.getStylesheets().add(getClass().getResource("/css/scheduler.css").toExternalForm());
         
-        stage.setTitle("Simple Project Resource Manager");
-        stage.setScene(scene);
-        stage.setMaximized(true);
+        // Update title with user info if authenticated
+        String title = "Simple Project Resource Manager";
+        if (sessionManager.getCurrentUser() != null) {
+            title += " - " + sessionManager.getCurrentUser().getFullName() + 
+                    " (" + sessionManager.getCurrentUserRole() + ")";
+        }
+        primaryStage.setTitle(title);
+        
+        primaryStage.setScene(scene);
+        primaryStage.setMaximized(true);
         
         // Set minimum window size
-        stage.setMinWidth(800);
-        stage.setMinHeight(600);
+        primaryStage.setMinWidth(800);
+        primaryStage.setMinHeight(600);
+        
+        // Track user activity for session management
+        scene.setOnMouseMoved(e -> sessionManager.updateActivity());
+        scene.setOnKeyPressed(e -> sessionManager.updateActivity());
         
         // Handle window close properly - ensure clean shutdown only on user request
-        stage.setOnCloseRequest(event -> {
+        primaryStage.setOnCloseRequest(event -> {
             logger.info("User requested application closure");
+            
+            // End session
+            if (sessionManager != null) {
+                sessionManager.endSession();
+            }
+            
             try {
                 if (databaseConfig != null) {
                     databaseConfig.shutdown();
@@ -96,7 +165,7 @@ public class SchedulerApplication extends Application {
         // Prevent implicit exit - keep application running
         Platform.setImplicitExit(false);
         
-        stage.show();
+        primaryStage.show();
         
         logger.info("JavaFX application started successfully");
     }
