@@ -1,356 +1,278 @@
-# SharePoint Integration Guide for Simple Project Resource Manager
+# SharePoint Integration Guide - Simple Export
 
 ## Overview
-This guide provides step-by-step instructions for integrating the Simple Project Resource Manager with SharePoint to enable technician calendar synchronization using Active Directory groups for authentication and authorization.
+This guide explains how to export assignment data from the Simple Project Resource Manager to SharePoint, allowing technicians to view their schedules through SharePoint calendars.
 
-## Prerequisites
-- SharePoint Online or SharePoint Server 2019/2016
-- Active Directory with configured groups:
-  - "Project Managers" - Full access to project management
-  - "CyberMetal" - Technician group for field service calendars
-- Admin rights to SharePoint site
-- Microsoft Graph API access (for calendar sync)
+## Quick Start
 
-## Architecture Overview
+### Step 1: Export from Application
+1. Open the Task List view for your project
+2. Click the **📤 Export** button in the toolbar
+3. Choose export format:
+   - **CSV for SharePoint List Import** - Creates a single CSV file for import
+   - **Individual Technician Schedules** - Creates separate CSV files per technician
+4. Select save location
+5. Click **Export**
 
-```
-┌─────────────────────┐
-│  JavaFX Desktop App │
-│  (Project Managers) │
-└──────────┬──────────┘
-           │
-           ▼
-    ┌──────────────┐
-    │     LDAP     │◄────── Active Directory
-    │Authentication│        Groups:
-    └──────┬───────┘        - Project Managers
-           │                - CyberMetal
-           ▼
-    ┌──────────────┐
-    │  Export/Sync │
-    │    Service   │
-    └──────┬───────┘
-           │
-           ▼
-    ┌──────────────┐
-    │  SharePoint  │
-    │   Calendar   │◄────── Technicians view
-    │     Lists    │        their schedules
-    └──────────────┘
-```
+### Step 2: Import to SharePoint
+1. Open your SharePoint site
+2. Navigate to your assignments list
+3. Click **Settings** → **Import from spreadsheet**
+4. Upload the exported CSV file
+5. Map columns as needed
 
-## Part 1: SharePoint Site Setup
+## Detailed SharePoint Setup
 
-### Step 1: Create SharePoint Site
-1. Navigate to SharePoint Admin Center
-2. Click "Create site" → "Team site"
-3. Site details:
+### Part 1: Create SharePoint Site
+
+1. **Create Team Site**
+   - Go to SharePoint home
+   - Click **Create site** → **Team site**
    - Name: "Project Resource Manager"
-   - Description: "Field service scheduling and resource management"
-   - Privacy: Private
-   - Language: English
+   - Privacy: Private (adjust as needed)
 
-### Step 2: Configure Site Permissions
-1. Go to Site Settings → Site Permissions
-2. Create permission groups:
-   ```
-   - PRM Managers (Full Control)
-   - PRM Technicians (Read/Contribute to calendars only)
-   - PRM Viewers (Read only)
-   ```
+2. **Set Basic Permissions**
+   - Project Managers: Full Control
+   - Technicians: Read/Contribute
+   - Others: Read Only
 
-### Step 3: Map AD Groups to SharePoint Groups
-1. Click "Grant Permissions"
-2. Add Active Directory groups:
+### Part 2: Create Assignment List
+
+1. **Create Custom List**
    ```
-   AD Group: "Project Managers" → SharePoint Group: "PRM Managers"
-   AD Group: "CyberMetal" → SharePoint Group: "PRM Technicians"
+   Site Contents → New → List
+   Name: "Field Assignments"
    ```
 
-## Part 2: Create SharePoint Lists and Calendars
+2. **Add Required Columns**
+   | Column Name | Type | Required |
+   |------------|------|----------|
+   | Technician | Person or Group | Yes |
+   | Project ID | Single line text | Yes |
+   | Project Name | Single line text | Yes |
+   | Task Description | Multiple lines text | No |
+   | Start Date | Date and Time | Yes |
+   | End Date | Date and Time | Yes |
+   | Location | Single line text | No |
+   | Status | Choice | Yes |
+   | Materials Status | Choice | No |
+   | PM Contact | Single line text | No |
+   | Notes | Multiple lines text | No |
 
-### Step 1: Create Master Assignment List
-1. Site Contents → New → List
-2. Name: "Field Assignments"
-3. Add columns:
-   ```
-   - Technician (Person or Group)
-   - Project ID (Single line text)
-   - Project Name (Single line text)
-   - Task Description (Multiple lines text)
-   - Start Date (Date and Time)
-   - End Date (Date and Time)
-   - Location (Single line text)
-   - Status (Choice: Scheduled, In Progress, Completed, Cancelled)
-   - Materials Status (Choice: Pending, Ready, On Site)
-   - PM Contact (Person or Group)
-   - Notes (Multiple lines text)
-   ```
+3. **Status Choice Values**
+   - Scheduled
+   - In Progress
+   - Completed
+   - Cancelled
+   - On Hold
 
-### Step 2: Create Technician Calendar View
-1. Open "Field Assignments" list
-2. Create View → Calendar View
+4. **Materials Status Values**
+   - Pending
+   - Ready
+   - On Site
+   - Not Required
+
+### Part 3: Create Calendar Views
+
+#### A. Master Calendar (All Assignments)
+1. In Field Assignments list, click **Create View**
+2. Choose **Calendar View**
 3. Configure:
-   - Name: "Technician Schedule"
+   - Name: "Master Schedule"
    - Time interval: Start Date to End Date
-   - Title: Project ID + Task Description
-   - Filter: [Me] in Technician field (shows only current user's assignments)
+   - Month/Week/Day Group: Start Date
+   - Title: Project ID
 
-### Step 3: Create Individual Technician Calendars
-For each technician, create a filtered calendar:
+#### B. Individual Technician Views
 1. Create View → Calendar View
-2. Name: "[Technician Name] Schedule"
-3. Filter: Technician equals specific person
-4. Set permissions so only that technician and managers can view
+2. Name: "My Schedule"
+3. Filter: `[Me]` in Technician field
+4. This shows only the current user's assignments
 
-## Part 3: Configure Microsoft Graph API
+#### C. Filtered Views by Team
+1. Create separate views for each team:
+   - "Team Alpha Schedule"
+   - "Team Bravo Schedule"
+2. Filter by specific technician names
 
-### Step 1: Register Application in Azure AD
-1. Go to Azure Portal → Azure Active Directory
-2. App registrations → New registration
-3. Configure:
-   ```
-   Name: Simple Project Resource Manager
-   Supported account types: Single tenant
-   Redirect URI: http://localhost:8080/callback (for desktop app)
-   ```
+### Part 4: Export/Import Process
 
-### Step 2: Configure API Permissions
-1. API permissions → Add permission
-2. Microsoft Graph → Delegated permissions:
+#### From Application to SharePoint
+
+1. **Export Data**
    ```
-   - Calendars.ReadWrite
-   - Sites.ReadWrite.All
-   - User.Read
-   - Group.Read.All
+   Application → Task List → Export Button
+   Choose: CSV for SharePoint List Import
+   Save to: Desktop or Documents
    ```
 
-### Step 3: Create Client Secret
-1. Certificates & secrets → New client secret
-2. Store securely (will be used in application config)
+2. **Prepare CSV (if needed)**
+   - Open in Excel
+   - Verify date formats (MM/DD/YYYY)
+   - Check technician names match SharePoint users
+   - Save as CSV
 
-### Step 4: Grant Admin Consent
-1. Click "Grant admin consent for [Organization]"
-2. Confirm permissions
+3. **Import to SharePoint**
+   
+   **Method 1: Quick Edit**
+   - Open Field Assignments list
+   - Click **Quick edit**
+   - Copy/paste from Excel
+   - Click **Exit quick edit**
 
-## Part 4: Application Configuration
+   **Method 2: Import Spreadsheet**
+   - Site Contents → New → Import Spreadsheet
+   - Browse to CSV file
+   - Map columns to list columns
+   - Import
 
-### Step 1: Update LDAP Configuration
-Edit `LDAPService.java` configuration:
-```java
-private static final String LDAP_URL = "ldap://your-dc.company.com:389";
-private static final String DOMAIN = "company.com";
-private static final String BASE_DN = "DC=company,DC=com";
-```
+### Part 5: Technician Access Options
 
-### Step 2: Configure SharePoint Connection
-Create `sharepoint.properties`:
-```properties
-sharepoint.site.url=https://yourcompany.sharepoint.com/sites/ProjectResourceManager
-sharepoint.tenant.id=your-tenant-id
-sharepoint.client.id=your-client-id
-sharepoint.client.secret=your-client-secret
-sharepoint.list.assignments=Field Assignments
-```
-
-### Step 3: Enable Authentication Mode
-Run application with LDAP authentication:
-```bash
-java -Dauth.mode=ldap -jar SimpleProjectResourceManager.jar
-```
-
-For development/testing without LDAP:
-```bash
-java -Dauth.mode=bypass -Ddev.mode=true -jar SimpleProjectResourceManager.jar
-```
-
-## Part 5: Data Synchronization
-
-### Manual Export Process
-1. In the application, select project(s) to export
-2. Right-click → "Export to SharePoint"
-3. Choose export options:
-   - All assignments
-   - Specific date range
-   - Specific technicians
-
-### Automatic Sync (Optional)
-Configure scheduled sync in application settings:
-```java
-// In application configuration
-scheduler.sharepoint.sync.enabled=true
-scheduler.sharepoint.sync.interval=30 // minutes
-scheduler.sharepoint.sync.mode=incremental
-```
-
-## Part 6: Technician Access
-
-### For Technicians to View Their Calendars:
-
-#### Option 1: SharePoint Site
-1. Navigate to: https://yourcompany.sharepoint.com/sites/ProjectResourceManager
-2. Click "Field Assignments" → "Technician Schedule"
+#### Option 1: Direct SharePoint Access
+1. Share site URL with technicians
+2. They navigate to Field Assignments → My Schedule
 3. Calendar shows only their assignments
 
 #### Option 2: Outlook Integration
-1. In SharePoint calendar, click "Connect to Outlook"
+1. In SharePoint calendar, click **Connect to Outlook**
 2. Calendar syncs to Outlook
-3. View on desktop and mobile Outlook apps
+3. Available on desktop and mobile
 
-#### Option 3: Teams Integration
-1. In Microsoft Teams, add SharePoint tab
-2. Select "Field Assignments" list
-3. Choose "Technician Schedule" view
+#### Option 3: Microsoft Teams
+1. In Teams channel, click **+** tab
+2. Add **SharePoint** → **Field Assignments**
+3. Select calendar view
+4. Team members see schedule in Teams
 
-## Part 7: Security Considerations
+#### Option 4: SharePoint Mobile App
+1. Install SharePoint mobile app
+2. Navigate to site
+3. Open Field Assignments list
+4. Switch to calendar view
 
-### Data Access Control
-- Project Managers: Full read/write access to all data
-- Technicians: Read-only access to their own assignments
-- No direct database access from SharePoint
-- All authentication through Active Directory
+### Part 6: Maintaining Data
 
-### Audit Trail
-SharePoint automatically maintains:
-- Version history for all list items
-- Who made changes and when
-- Ability to restore previous versions
+#### Regular Updates
+1. **Daily/Weekly Export**
+   - Export updated assignments
+   - Import to SharePoint (overwrites existing)
 
-## Part 8: Troubleshooting
+2. **Incremental Updates**
+   - Export only changed assignments
+   - Update specific items in SharePoint
 
-### Common Issues and Solutions
+3. **Bulk Operations**
+   - Use Quick Edit for multiple changes
+   - Export all → Clear list → Import fresh
 
-#### 1. LDAP Connection Failed
-```
-Error: Cannot connect to authentication server
-Solution:
-- Verify LDAP URL and port (usually 389 or 636 for SSL)
-- Check firewall rules
-- Ensure service account has read permissions
-```
+### Part 7: CSV File Format
 
-#### 2. SharePoint List Not Found
-```
-Error: List 'Field Assignments' not found
-Solution:
-- Verify list name matches configuration
-- Check user has permissions to the list
-- Ensure site URL is correct
+The exported CSV contains these columns:
+```csv
+Technician,Project ID,Project Name,Task Description,Start Date,End Date,Location,Status,Materials Status,PM Contact,Notes
+"John Smith","PRJ-2025-001","Oak Street Installation","Install doghouse","01/15/2025","01/17/2025","123 Oak St","Scheduled","Ready","PM-1","2-story deluxe model"
 ```
 
-#### 3. Calendar Not Syncing
-```
-Error: Failed to sync calendar events
-Solution:
-- Check Microsoft Graph API permissions
-- Verify API credentials are valid
-- Check SharePoint site permissions
-```
+### Part 8: Troubleshooting
 
-#### 4. Technicians Can't See Calendar
-```
-Issue: Technician logged in but calendar is empty
-Solution:
-- Verify technician is in "CyberMetal" AD group
-- Check SharePoint group membership
-- Ensure calendar view filter is correct
-```
+| Issue | Solution |
+|-------|----------|
+| Dates import incorrectly | Ensure MM/DD/YYYY format in CSV |
+| Technician names don't match | Use exact SharePoint display names |
+| Calendar view is empty | Check view filters and date range |
+| Can't import CSV | Check file encoding (use UTF-8) |
+| Permissions error | Ensure users have Contribute rights |
 
-## Part 9: Testing Checklist
+### Part 9: Best Practices
 
-Before going live, test:
+1. **Naming Conventions**
+   - Use consistent Project IDs
+   - Standardize technician names
+   - Clear task descriptions
 
-- [ ] LDAP authentication with Project Manager account
-- [ ] LDAP authentication with Technician account
-- [ ] Export single project to SharePoint
-- [ ] Export multiple projects to SharePoint
-- [ ] Technician can view their calendar in SharePoint
-- [ ] Technician cannot view other technicians' calendars
-- [ ] Project Manager can view all calendars
-- [ ] Calendar syncs to Outlook correctly
-- [ ] Session timeout works (30 minutes)
-- [ ] Audit trail captures changes
+2. **Update Frequency**
+   - Export daily for active projects
+   - Weekly for planning purposes
+   - After any major schedule changes
 
-## Part 10: Maintenance
+3. **Data Validation**
+   - Verify dates before export
+   - Check for assignment conflicts
+   - Ensure all required fields populated
 
-### Regular Tasks
-1. **Weekly**: Review sync logs for errors
-2. **Monthly**: Check SharePoint storage usage
-3. **Quarterly**: Review and update AD group memberships
-4. **Annually**: Review and rotate API credentials
+4. **Backup**
+   - Keep copy of exported CSVs
+   - Document import dates
+   - Maintain change log
 
-### Backup Strategy
-1. SharePoint lists are automatically backed up by Microsoft
-2. Export critical data weekly to CSV
-3. Maintain local database backups
+### Part 10: PowerShell Automation (Optional)
 
-## Support Contacts
-
-For issues with:
-- **Application**: IT Help Desk (ext. 1234)
-- **SharePoint**: SharePoint Admin (sharepoint@company.com)
-- **Active Directory**: AD Admin (adadmin@company.com)
-- **Developer Support**: dev-team@company.com
-
-## Appendix A: PowerShell Scripts
-
-### Create SharePoint List via PowerShell
+#### Automated Import Script
 ```powershell
-Connect-PnPOnline -Url "https://yourcompany.sharepoint.com/sites/ProjectResourceManager"
+# Connect to SharePoint
+Connect-PnPOnline -Url "https://yoursite.sharepoint.com/sites/ProjectRM"
 
-$listName = "Field Assignments"
-New-PnPList -Title $listName -Template GenericList
+# Read CSV
+$assignments = Import-Csv "C:\Exports\assignments.csv"
 
-# Add columns
-Add-PnPField -List $listName -DisplayName "Technician" -InternalName "Technician" -Type User
-Add-PnPField -List $listName -DisplayName "Project ID" -InternalName "ProjectID" -Type Text
-Add-PnPField -List $listName -DisplayName "Start Date" -InternalName "StartDate" -Type DateTime
-# ... add remaining columns
-```
-
-### Export Assignments to SharePoint
-```powershell
-# Run from application server
-$csvPath = "C:\Exports\assignments.csv"
-$assignments = Import-Csv $csvPath
-
-foreach ($assignment in $assignments) {
+# Import to list
+foreach ($item in $assignments) {
     Add-PnPListItem -List "Field Assignments" -Values @{
-        "Technician" = $assignment.Technician
-        "ProjectID" = $assignment.ProjectID
-        "StartDate" = $assignment.StartDate
-        # ... map remaining fields
+        "Title" = $item.'Project ID'
+        "Technician" = $item.Technician
+        "ProjectName" = $item.'Project Name'
+        "StartDate" = [DateTime]$item.'Start Date'
+        "EndDate" = [DateTime]$item.'End Date'
+        "Status" = $item.Status
     }
 }
 ```
 
-## Appendix B: Sample Configuration Files
+#### Scheduled Export Task
+Create Windows Task Scheduler job:
+1. Trigger: Daily at 6 AM
+2. Action: Run PowerShell script
+3. Script exports and emails CSV
 
-### LDAP Test Script (ldap-test.ps1)
-```powershell
-$username = Read-Host "Enter username"
-$password = Read-Host "Enter password" -AsSecureString
-$domain = "company.com"
+### Part 11: Email Notifications (Optional)
 
-$cred = New-Object System.Management.Automation.PSCredential ("$username@$domain", $password)
+Configure SharePoint alerts:
+1. Field Assignments → Alert Me
+2. Choose:
+   - When: Items are added/changed
+   - Filter: Assigned to me
+   - Frequency: Daily summary
+3. Technicians receive email updates
 
-try {
-    $searcher = New-Object DirectoryServices.DirectorySearcher
-    $searcher.Filter = "(samaccountname=$username)"
-    $result = $searcher.FindOne()
-    
-    if ($result) {
-        Write-Host "Authentication successful!"
-        Write-Host "Groups:"
-        $result.Properties.memberof | ForEach-Object { Write-Host " - $_" }
-    }
-} catch {
-    Write-Host "Authentication failed: $_"
-}
-```
+### Appendix A: Sample Files
+
+Sample CSV and import templates available in:
+- `/docs/sharepoint-templates/`
+- Includes sample data
+- Column mapping guide
+- Import instructions
+
+### Appendix B: Quick Reference Card
+
+**For Project Managers:**
+1. Export: Task List → 📤 Export → CSV
+2. Import: SharePoint → Quick Edit → Paste
+3. Verify: Check calendar views
+
+**For Technicians:**
+1. Access: SharePoint site → Field Assignments
+2. View: My Schedule (calendar)
+3. Sync: Connect to Outlook (optional)
+
+### Support
+
+For issues or questions:
+- Application Support: Check application logs
+- SharePoint Support: Contact SharePoint admin
+- Import/Export Help: See troubleshooting section
 
 ---
 
-**Document Version**: 1.0
-**Last Updated**: Today
-**Next Review**: Quarterly
+**Version:** 2.0 (Simplified - No LDAP Required)  
+**Last Updated:** Today  
+**Next Review:** As needed

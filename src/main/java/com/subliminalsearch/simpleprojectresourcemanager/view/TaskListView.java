@@ -12,6 +12,7 @@ import com.subliminalsearch.simpleprojectresourcemanager.view.CriticalPathView;
 import com.subliminalsearch.simpleprojectresourcemanager.view.DashboardView;
 import com.subliminalsearch.simpleprojectresourcemanager.view.GanttChartView;
 import com.subliminalsearch.simpleprojectresourcemanager.view.MapView;
+import com.subliminalsearch.simpleprojectresourcemanager.service.SharePointExportService;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -26,11 +27,14 @@ import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.control.cell.TextFieldTableCell;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
+import javafx.stage.FileChooser;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.util.Callback;
 import javafx.util.StringConverter;
 
+import java.io.File;
+import java.io.IOException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -257,7 +261,7 @@ public class TaskListView {
         
         Button exportBtn = new Button("📤 Export");
         exportBtn.setStyle("-fx-font-size: 14px;");
-        exportBtn.setOnAction(e -> openExportDialog());
+        exportBtn.setOnAction(e -> showExportToSharePointDialog());
         
         header.getChildren().addAll(projectInfo, spacer, dashboardBtn, listViewBtn, kanbanBtn, ganttBtn,
                                   timelineBtn, calendarBtn, criticalPathBtn, mapBtn, 
@@ -1238,5 +1242,158 @@ public class TaskListView {
             tasks.setAll(allTasks);
             updateStatusLabel();
         }
+    }
+    
+    private void showExportToSharePointDialog() {
+        Dialog<Void> dialog = new Dialog<>();
+        dialog.setTitle("Export to SharePoint");
+        dialog.setHeaderText("Export assignments for technician calendars");
+        
+        VBox content = new VBox(10);
+        content.setPadding(new Insets(20));
+        content.setPrefWidth(500);
+        
+        // Export options
+        Label instructionLabel = new Label("Choose export format:");
+        instructionLabel.setStyle("-fx-font-weight: bold;");
+        
+        RadioButton csvOption = new RadioButton("CSV for SharePoint List Import");
+        csvOption.setSelected(true);
+        RadioButton icsOption = new RadioButton("ICS Calendar Format");
+        RadioButton individualOption = new RadioButton("Individual Technician Schedules");
+        
+        ToggleGroup formatGroup = new ToggleGroup();
+        csvOption.setToggleGroup(formatGroup);
+        icsOption.setToggleGroup(formatGroup);
+        individualOption.setToggleGroup(formatGroup);
+        
+        // Date range selection
+        Label dateLabel = new Label("Date Range:");
+        dateLabel.setStyle("-fx-font-weight: bold; -fx-padding: 10 0 0 0;");
+        
+        DatePicker startDate = new DatePicker(LocalDate.now());
+        DatePicker endDate = new DatePicker(LocalDate.now().plusMonths(1));
+        
+        HBox dateBox = new HBox(10);
+        dateBox.getChildren().addAll(new Label("From:"), startDate, new Label("To:"), endDate);
+        
+        // File location
+        Label fileLabel = new Label("Export Location:");
+        fileLabel.setStyle("-fx-font-weight: bold; -fx-padding: 10 0 0 0;");
+        
+        TextField fileField = new TextField();
+        fileField.setText(System.getProperty("user.home") + "\\SharePoint_Export_" + 
+                         LocalDate.now().format(DateTimeFormatter.ISO_DATE) + ".csv");
+        fileField.setPrefWidth(400);
+        
+        Button browseBtn = new Button("Browse...");
+        browseBtn.setOnAction(e -> {
+            FileChooser fileChooser = new FileChooser();
+            fileChooser.setTitle("Save Export File");
+            fileChooser.setInitialFileName("SharePoint_Export.csv");
+            fileChooser.getExtensionFilters().addAll(
+                new FileChooser.ExtensionFilter("CSV Files", "*.csv"),
+                new FileChooser.ExtensionFilter("Calendar Files", "*.ics"),
+                new FileChooser.ExtensionFilter("All Files", "*.*")
+            );
+            
+            File file = fileChooser.showSaveDialog(dialog.getOwner());
+            if (file != null) {
+                fileField.setText(file.getAbsolutePath());
+            }
+        });
+        
+        HBox fileBox = new HBox(10);
+        fileBox.getChildren().addAll(fileField, browseBtn);
+        
+        // Progress indicator
+        ProgressBar progressBar = new ProgressBar();
+        progressBar.setPrefWidth(480);
+        progressBar.setVisible(false);
+        
+        Label statusLabel = new Label();
+        statusLabel.setStyle("-fx-text-fill: green;");
+        
+        content.getChildren().addAll(
+            instructionLabel,
+            csvOption,
+            icsOption, 
+            individualOption,
+            new Separator(),
+            dateLabel,
+            dateBox,
+            new Separator(),
+            fileLabel,
+            fileBox,
+            progressBar,
+            statusLabel
+        );
+        
+        dialog.getDialogPane().setContent(content);
+        
+        ButtonType exportButton = new ButtonType("Export", ButtonBar.ButtonData.OK_DONE);
+        ButtonType cancelButton = ButtonType.CANCEL;
+        dialog.getDialogPane().getButtonTypes().addAll(exportButton, cancelButton);
+        
+        // Export action
+        Button exportBtn = (Button) dialog.getDialogPane().lookupButton(exportButton);
+        exportBtn.setOnAction(e -> {
+            progressBar.setVisible(true);
+            statusLabel.setText("Exporting...");
+            
+            // Create export service
+            SharePointExportService exportService = new SharePointExportService(
+                taskRepository, resourceRepository
+            );
+            
+            try {
+                String filePath = fileField.getText();
+                
+                if (csvOption.isSelected()) {
+                    // Export current project to CSV
+                    if (project != null) {
+                        exportService.exportAssignmentsToCSV(filePath, project);
+                        statusLabel.setText("✓ Export completed successfully!");
+                        statusLabel.setStyle("-fx-text-fill: green;");
+                        
+                        // Show success alert
+                        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                        alert.setTitle("Export Complete");
+                        alert.setHeaderText("SharePoint export completed");
+                        alert.setContentText("File saved to: " + filePath + "\n\n" +
+                                           "You can now import this CSV file into your SharePoint list.");
+                        alert.showAndWait();
+                    }
+                } else if (individualOption.isSelected()) {
+                    // Export individual schedules
+                    String directory = new File(filePath).getParent();
+                    List<Project> projects = List.of(project);
+                    exportService.exportAllTechnicianCalendars(directory, projects);
+                    
+                    statusLabel.setText("✓ Individual schedules exported!");
+                    statusLabel.setStyle("-fx-text-fill: green;");
+                    
+                    Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                    alert.setTitle("Export Complete");
+                    alert.setHeaderText("Individual technician schedules exported");
+                    alert.setContentText("Files saved to: " + directory);
+                    alert.showAndWait();
+                }
+                
+            } catch (IOException ex) {
+                statusLabel.setText("✗ Export failed: " + ex.getMessage());
+                statusLabel.setStyle("-fx-text-fill: red;");
+                
+                Alert alert = new Alert(Alert.AlertType.ERROR);
+                alert.setTitle("Export Failed");
+                alert.setHeaderText("Could not export to SharePoint format");
+                alert.setContentText(ex.getMessage());
+                alert.showAndWait();
+            } finally {
+                progressBar.setVisible(false);
+            }
+        });
+        
+        dialog.showAndWait();
     }
 }

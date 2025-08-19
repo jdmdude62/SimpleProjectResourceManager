@@ -62,7 +62,7 @@ public class SharePointExportService {
      * Export assignments for a specific technician
      */
     public void exportTechnicianSchedule(String filePath, Long resourceId, List<Project> projects) throws IOException {
-        Resource technician = resourceRepository.findById(resourceId);
+        Resource technician = resourceRepository.findById(resourceId).orElse(null);
         if (technician == null) {
             throw new IllegalArgumentException("Technician not found: " + resourceId);
         }
@@ -157,11 +157,11 @@ public class SharePointExportService {
         }
         row.append(materialsStatus).append(",");
         
-        // PM Contact
-        row.append(escapeCSV(project.getProjectManager() != null ? project.getProjectManager() : "")).append(",");
+        // PM Contact (using project manager ID for now)
+        row.append(escapeCSV(project.getProjectManagerId() != null ? "PM-" + project.getProjectManagerId() : "")).append(",");
         
-        // Notes
-        row.append(escapeCSV(task.getNotes() != null ? task.getNotes() : "")).append("\n");
+        // Notes (using description for now)
+        row.append(escapeCSV(task.getDescription() != null ? task.getDescription() : "")).append("\n");
         
         return row.toString();
     }
@@ -222,8 +222,8 @@ public class SharePointExportService {
         desc.append("Project: ").append(project.getProjectId()).append("\\n");
         desc.append("Task: ").append(task.getTitle()).append("\\n");
         
-        if (task.getNotes() != null) {
-            desc.append("Notes: ").append(task.getNotes()).append("\\n");
+        if (task.getDescription() != null) {
+            desc.append("Notes: ").append(task.getDescription()).append("\\n");
         }
         
         if (task.getProgressPercentage() != null) {
