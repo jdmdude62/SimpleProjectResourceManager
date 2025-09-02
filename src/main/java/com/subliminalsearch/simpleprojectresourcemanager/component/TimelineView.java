@@ -7,7 +7,12 @@ import com.subliminalsearch.simpleprojectresourcemanager.model.ProjectStatus;
 import com.subliminalsearch.simpleprojectresourcemanager.model.Resource;
 import com.subliminalsearch.simpleprojectresourcemanager.model.TechnicianUnavailability;
 import com.subliminalsearch.simpleprojectresourcemanager.model.UnavailabilityType;
+import com.subliminalsearch.simpleprojectresourcemanager.model.UtilizationSettings;
 import com.subliminalsearch.simpleprojectresourcemanager.service.FinancialService;
+import com.subliminalsearch.simpleprojectresourcemanager.service.OpenItemService;
+import com.subliminalsearch.simpleprojectresourcemanager.config.DatabaseConfig;
+import com.subliminalsearch.simpleprojectresourcemanager.util.HelpButton;
+import com.subliminalsearch.simpleprojectresourcemanager.util.DialogUtils;
 import com.subliminalsearch.simpleprojectresourcemanager.view.FinancialTrackingDialog;
 import javafx.application.Platform;
 import javafx.beans.property.ObjectProperty;
@@ -19,6 +24,7 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.*;
+import javafx.scene.control.Button;
 import javafx.scene.image.PixelWriter;
 import javafx.scene.image.WritableImage;
 import javafx.scene.input.*;
@@ -35,6 +41,7 @@ import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
@@ -42,7 +49,9 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.Comparator;
 import java.util.stream.Collectors;
 
 public class TimelineView extends VBox {
@@ -51,7 +60,7 @@ public class TimelineView extends VBox {
     // Base constants for timeline display
     private static final double BASE_DAY_WIDTH = 30.0;
     private static final double BASE_ROW_HEIGHT = 60.0; // Increased to accommodate taller project bars
-    private static final double BASE_PROJECT_BAR_HEIGHT = 40.0; // Increased for multi-line text
+    private static final double BASE_PROJECT_BAR_HEIGHT = 45.0; // Increased for 3 lines of text
     private static final double BASE_RESOURCE_LABEL_WIDTH = 200.0; // Increased for longer resource names
     private static final double HEADER_HEIGHT = 45.0; // Fixed header height for both sides
     
@@ -80,9 +89,20 @@ public class TimelineView extends VBox {
     private final ObservableList<Assignment> assignments = FXCollections.observableArrayList();
     private final ObservableList<TechnicianUnavailability> unavailabilities = FXCollections.observableArrayList();
     private final ObservableList<CompanyHoliday> companyHolidays = FXCollections.observableArrayList();
+    private final ObservableList<com.subliminalsearch.simpleprojectresourcemanager.model.ProjectManager> projectManagers = FXCollections.observableArrayList();
+    private Map<Long, com.subliminalsearch.simpleprojectresourcemanager.model.ProjectManager> projectManagerMap = new HashMap<>();
     
     // Conflict detection
     private Set<Long> conflictedAssignmentIds = new HashSet<>();
+    
+    // Utilization Settings
+    private UtilizationSettings utilizationSettings = new UtilizationSettings();
+    
+    // Display Settings
+    private boolean showUnavailability = true;
+    
+    // Services
+    private OpenItemService openItemService;
     
     // UI Components
     private HBox headerRow;
@@ -105,7 +125,9 @@ public class TimelineView extends VBox {
     
     // Callback handlers for context menu actions
     private Consumer<Project> onEditProject;
+    private Consumer<Project> onManageOpenItems;
     private Consumer<Project> onDeleteProject;
+    private Consumer<Project> onDeleteProjectWithAssignments;
     private Consumer<Resource> onEditResource;
     private Consumer<Resource> onDeleteResource;
     private Consumer<Resource> onMarkResourceUnavailable;
@@ -119,6 +141,7 @@ public class TimelineView extends VBox {
     private Consumer<Project> onGenerateReport;
     private Consumer<Project> onShowProjectTasks;
     private Consumer<Project> onViewInReportCenter;
+    private BiConsumer<String, Object> onApplyFilter;
     
     // Drag and drop state
     private Assignment draggedAssignment;
@@ -130,8 +153,21 @@ public class TimelineView extends VBox {
     
     public TimelineView() {
         this.getStyleClass().add("timeline-view");
+        
+        // OpenItemService will be set by controller
+        
         initializeComponent();
         setupEventHandlers();
+    }
+    
+    public void setDatabaseConfig(DatabaseConfig databaseConfig) {
+        if (databaseConfig != null) {
+            try {
+                openItemService = new OpenItemService(databaseConfig);
+            } catch (Exception e) {
+                System.err.println("Could not initialize OpenItemService: " + e.getMessage());
+            }
+        }
     }
     
     private void initializeComponent() {
@@ -218,8 +254,15 @@ public class TimelineView extends VBox {
         mainContainer.getChildren().addAll(fixedResourceColumn, scrollPane);
         HBox.setHgrow(scrollPane, Priority.ALWAYS);
         
-        // Add main container to this component
-        this.getChildren().add(mainContainer);
+        // Create a header bar with help button
+        HBox headerBar = new HBox();
+        headerBar.setAlignment(Pos.CENTER_RIGHT);
+        headerBar.setPadding(new Insets(5));
+        Button helpBtn = HelpButton.create("Timeline View", HelpButton.HelpContent.TIMELINE_VIEW);
+        headerBar.getChildren().add(helpBtn);
+        
+        // Add header bar and main container to this component
+        this.getChildren().addAll(headerBar, mainContainer);
         VBox.setVgrow(mainContainer, Priority.ALWAYS);
         
         // Set initial date range (current month)
@@ -257,7 +300,7 @@ public class TimelineView extends VBox {
         long daysBetween = ChronoUnit.DAYS.between(start, end);
         if (daysBetween <= 7) {
             currentViewMode = ViewMode.WEEK;
-        } else if (daysBetween <= 31) {
+        } else if (daysBetween <= 42) {  // 6 weeks = 42 days
             currentViewMode = ViewMode.MONTH;
         } else {
             currentViewMode = ViewMode.QUARTER;
@@ -334,7 +377,8 @@ public class TimelineView extends VBox {
             boolean isToday = date.equals(LocalDate.now());
             
             // Add visible border for day separation and ensure full height
-            String baseStyle = "-fx-border-color: #d0d0d0; -fx-border-width: 0 1 1 0; -fx-padding: 0;";
+            // Note: Only use bottom border to avoid cumulative width drift from right borders
+            String baseStyle = "-fx-border-color: #d0d0d0; -fx-border-width: 0 0 1 0; -fx-padding: 0;";
             
             // Apply background colors to match timeline
             if (isToday) {
@@ -364,12 +408,17 @@ public class TimelineView extends VBox {
                     break;
                     
                 case MONTH:
-                    // For month view, show day number, with month on first day
-                    if (date.getDayOfMonth() == 1 || i == 0) {
+                    // For month view (6 weeks), show month name on first day of each month
+                    // and at the start of the view
+                    boolean isFirstDayOfMonth = date.getDayOfMonth() == 1;
+                    boolean isFirstDayOfView = i == 0;
+                    
+                    if (isFirstDayOfMonth || isFirstDayOfView) {
+                        // Show month name above day number
                         displayText = date.format(monthFormatter) + "\n" + date.format(dayFormatter);
                     } else {
                         displayText = date.format(dayFormatter);
-                        // Show weekday if zoomed in enough
+                        // Show weekday initial if zoomed in enough
                         if (zoomLevel >= 1.25) {
                             displayText = date.format(weekdayFormatter).substring(0, 1) + "\n" + displayText;
                         }
@@ -398,18 +447,28 @@ public class TimelineView extends VBox {
     }
     
     private void buildTimelineContent(LocalDate start, LocalDate end) {
-        if (resources.isEmpty()) {
-            // Show message when no resources
-            Label emptyLabel = new Label("No resources to display");
-            emptyLabel.getStyleClass().add("text-muted");
-            timelineGrid.add(emptyLabel, 0, 0, (int)(ChronoUnit.DAYS.between(start, end) + 1), 1);
-            return;
+        int rowIndex = 0;
+        
+        // First, add rows for unassigned projects (one row per project)
+        List<Project> unassignedProjects = findUnassignedProjects(start, end);
+        for (Project unassignedProject : unassignedProjects) {
+            createUnassignedProjectRow(unassignedProject, start, end, rowIndex);
+            rowIndex++;
         }
         
-        int rowIndex = 0;
+        if (resources.isEmpty()) {
+            // Show message when no resources (but only if no unassigned projects either)
+            if (unassignedProjects.isEmpty()) {
+                Label emptyLabel = new Label("No resources or projects to display");
+                emptyLabel.getStyleClass().add("text-muted");
+                timelineGrid.add(emptyLabel, 0, 0, (int)(ChronoUnit.DAYS.between(start, end) + 1), 1);
+                return;
+            }
+        }
         for (Resource resource : resources) {
-            // Calculate resource utilization
-            double utilizationPercentage = calculateResourceUtilization(resource, start, end);
+            // Calculate resource metrics (utilization and billable)
+            ResourceMetrics metrics = calculateResourceMetrics(resource, start, end);
+            double utilizationPercentage = metrics.utilizationPercent;
             
             // Create container using StackPane to layer elements without spacing issues
             StackPane resourceContainer = new StackPane();
@@ -432,8 +491,11 @@ public class TimelineView extends VBox {
                 resourceContainer.setStyle("-fx-background-color: white; -fx-border-color: #cccccc; -fx-border-width: 0 0 1 0;");
             }
             
-            // Create a single label with integrated progress bar background
-            String resourceText = String.format("%s (%.0f%%)", resource.getName(), utilizationPercentage);
+            // Create a single label with both utilization and billable percentages
+            String resourceText = String.format("%s\nUtil: %.0f%% | Bill: %.0f%%", 
+                resource.getName(), 
+                metrics.utilizationPercent,
+                metrics.billablePercent);
             Label resourceLabel = new Label(resourceText);
             resourceLabel.setAlignment(Pos.CENTER_LEFT);
             resourceLabel.setPrefWidth(resourceLabelWidth - 10);
@@ -444,21 +506,33 @@ public class TimelineView extends VBox {
             resourceLabel.setPadding(new Insets(5, 5, 5, 5));
             resourceLabel.setTextOverrun(OverrunStyle.ELLIPSIS);
             
-            // Determine bar color based on utilization
+            // Determine bar color based on utilization and billable percentage
             String barColor;
             String barColorHex;
             if (utilizationPercentage > 100) {
                 barColorHex = "#dc3545"; // Red for overallocated
                 barColor = "rgba(220, 53, 69, 0.3)";
             } else if (utilizationPercentage > 80) {
-                barColorHex = "#ffc107"; // Yellow for high utilization
-                barColor = "rgba(255, 193, 7, 0.3)";
+                // High utilization - check if it's mostly billable
+                if (metrics.billablePercent > 60) {
+                    barColorHex = "#28a745"; // Green for high billable utilization
+                    barColor = "rgba(40, 167, 69, 0.3)";
+                } else {
+                    barColorHex = "#ffc107"; // Yellow for high utilization but low billable
+                    barColor = "rgba(255, 193, 7, 0.3)";
+                }
             } else if (utilizationPercentage > 50) {
-                barColorHex = "#28a745"; // Green for good utilization
-                barColor = "rgba(40, 167, 69, 0.3)";
+                // Medium utilization
+                if (metrics.billablePercent > 60) {
+                    barColorHex = "#28a745"; // Green for good billable utilization
+                    barColor = "rgba(40, 167, 69, 0.3)";
+                } else {
+                    barColorHex = "#17a2b8"; // Blue for medium utilization, low billable
+                    barColor = "rgba(23, 162, 184, 0.3)";
+                }
             } else {
-                barColorHex = "#17a2b8"; // Blue for low utilization
-                barColor = "rgba(23, 162, 184, 0.3)";
+                barColorHex = "#6c757d"; // Gray for low utilization
+                barColor = "rgba(108, 117, 125, 0.3)";
             }
             
             // Calculate progress width (cap at 100% for display)
@@ -527,23 +601,31 @@ public class TimelineView extends VBox {
         
         // Create background for the entire row
         long dayCount = ChronoUnit.DAYS.between(start, end) + 1;
-        HBox rowContainer = new HBox();
+        Pane rowContainer = new Pane();  // Changed from HBox to Pane for absolute positioning
         rowContainer.setPrefHeight(rowHeight);
         rowContainer.setMaxHeight(rowHeight);
         rowContainer.setMinHeight(rowHeight);
-        rowContainer.setSpacing(0);
+        rowContainer.setPrefWidth(dayCount * dayWidth);
+        rowContainer.setMaxWidth(dayCount * dayWidth);
+        rowContainer.setMinWidth(dayCount * dayWidth);
         
         // Make row container transparent so day cell borders show through
         rowContainer.setStyle("-fx-background-color: transparent;");
         
-        // Add unavailability bars first (they appear behind assignments)
-        for (TechnicianUnavailability unavailability : resourceUnavailabilities) {
-            createUnavailabilityBar(unavailability, start, end, rowContainer, rowIndex);
+        // Add assignment bars first (they appear behind)
+        for (Assignment assignment : resourceAssignments) {
+            // Check if assignment should be shown based on unavailability settings
+            if (shouldShowAssignment(assignment, resourceUnavailabilities)) {
+                boolean hasConflict = showUnavailability && hasUnavailabilityConflict(assignment, resourceUnavailabilities);
+                createAssignmentBar(assignment, start, end, rowContainer, rowIndex, hasConflict);
+            }
         }
         
-        // Add assignment bars on top
-        for (Assignment assignment : resourceAssignments) {
-            createAssignmentBar(assignment, start, end, rowContainer, rowIndex);
+        // Add unavailability bars on top (they appear in front) - only if toggle is on
+        if (showUnavailability) {
+            for (TechnicianUnavailability unavailability : resourceUnavailabilities) {
+                createUnavailabilityBar(unavailability, start, end, rowContainer, rowIndex);
+            }
         }
         
         // Add individual day cells with borders for grid visibility
@@ -558,7 +640,8 @@ public class TimelineView extends VBox {
             dayCell.setMaxHeight(rowHeight);
             
             // Build style with borders and background based on day type
-            String cellStyle = "-fx-border-color: #d0d0d0; -fx-border-width: 0 1 1 0;";
+            // Only use bottom border to avoid cumulative width drift from right borders
+            String cellStyle = "-fx-border-color: #d0d0d0; -fx-border-width: 0 0 1 0;";
             
             // Check if this is a weekend or holiday
             boolean isWeekend = cellDate.getDayOfWeek() == java.time.DayOfWeek.SATURDAY || 
@@ -588,7 +671,12 @@ public class TimelineView extends VBox {
     }
     
     private void createAssignmentBar(Assignment assignment, LocalDate timelineStart, LocalDate timelineEnd, 
-                                   HBox rowContainer, int rowIndex) {
+                                   Pane rowContainer, int rowIndex) {
+        createAssignmentBar(assignment, timelineStart, timelineEnd, rowContainer, rowIndex, false);
+    }
+    
+    private void createAssignmentBar(Assignment assignment, LocalDate timelineStart, LocalDate timelineEnd, 
+                                   Pane rowContainer, int rowIndex, boolean hasUnavailabilityConflict) {
         
         // Calculate assignment bar positioning
         LocalDate assignStart = assignment.getStartDate();
@@ -598,8 +686,19 @@ public class TimelineView extends VBox {
         LocalDate barStart = assignStart.isBefore(timelineStart) ? timelineStart : assignStart;
         LocalDate barEnd = assignEnd.isAfter(timelineEnd) ? timelineEnd : assignEnd;
         
+        // Skip if assignment is completely outside the timeline range
+        if (barStart.isAfter(timelineEnd) || barEnd.isBefore(timelineStart)) {
+            return;
+        }
+        
         long startDayOffset = ChronoUnit.DAYS.between(timelineStart, barStart);
         long barDuration = ChronoUnit.DAYS.between(barStart, barEnd) + 1;
+        
+        // Ensure bar doesn't extend beyond the calendar grid
+        long maxDaysInView = ChronoUnit.DAYS.between(timelineStart, timelineEnd) + 1;
+        if (startDayOffset + barDuration > maxDaysInView) {
+            barDuration = maxDaysInView - startDayOffset;
+        }
         
         logger.debug("Creating assignment bar - ID: {}, Dates: {} to {}, Timeline: {} to {}", 
             assignment.getId(), assignStart, assignEnd, timelineStart, timelineEnd);
@@ -627,22 +726,100 @@ public class TimelineView extends VBox {
         
         // Create assignment bar
         Label assignmentBar = new Label();
-        // Combine project ID and description with line break
+        // Combine project ID, description, location, and address with line breaks
         String projectId = project != null ? project.getProjectId() : "Unknown";
         String description = project != null && project.getDescription() != null ? project.getDescription() : "";
+        String location = assignment.getLocation() != null && !assignment.getLocation().isEmpty() ? 
+                         " @ " + assignment.getLocation() : "";
+        String address = project != null && project.getContactAddress() != null ? project.getContactAddress() : "";
         
-        // Create multi-line text with project ID on first line, description on second
+        // Create multi-line text with project ID (+ location) on first line, description on second, address on third
         String displayText;
         boolean hasDescription = !description.isEmpty() && barDuration >= 3; // Only show description if bar is wide enough
-        if (hasDescription) {
-            // Truncate description if it's too long
-            String truncatedDesc = description.length() > 30 ? description.substring(0, 27) + "..." : description;
-            displayText = projectId + "\n" + truncatedDesc;
+        boolean hasAddress = !address.isEmpty() && barDuration >= 4; // Show address if bar is 4+ days wide
+        
+        // Special handling for SHOP projects - only show description
+        if ("SHOP".equalsIgnoreCase(projectId) || "TRAINING".equalsIgnoreCase(projectId)) {
+            displayText = description.isEmpty() ? projectId : description;
         } else {
-            displayText = projectId;
+            // Determine display text first for logging
+            if (hasDescription && hasAddress) {
+                // Truncate description and address if they're too long
+                String truncatedDesc = description.length() > 30 ? description.substring(0, 27) + "..." : description;
+                String truncatedAddr = address.length() > 30 ? address.substring(0, 27) + "..." : address;
+                displayText = projectId + location + "\n" + truncatedDesc + "\n" + truncatedAddr;
+            } else if (hasDescription) {
+                // Truncate description if it's too long
+                String truncatedDesc = description.length() > 30 ? description.substring(0, 27) + "..." : description;
+                displayText = projectId + location + "\n" + truncatedDesc;
+            } else {
+                displayText = projectId + location;
+            }
         }
         
-        assignmentBar.setText(displayText);
+        // Enhanced debug logging for CH-PBLD-2025-097
+        if (projectId.equals("CH-PBLD-2025-097")) {
+            logger.info("====== CH-PBLD-2025-097 Detailed Info ======");
+            logger.info("Project Details:");
+            logger.info("  - Project ID: {}", projectId);
+            logger.info("  - Project Description: '{}'", project.getDescription());
+            logger.info("  - Project Start: {}", project.getStartDate());
+            logger.info("  - Project End: {}", project.getEndDate());
+            logger.info("  - Project Duration: {} days", 
+                java.time.temporal.ChronoUnit.DAYS.between(project.getStartDate(), project.getEndDate()) + 1);
+            logger.info("Assignment Details:");
+            logger.info("  - Assignment Start: {}", startDate);
+            logger.info("  - Assignment End: {}", endDate);
+            logger.info("  - Assignment Duration: {} days", barDuration);
+            logger.info("  - Resource ID: {}", assignment.getResourceId());
+            logger.info("Display Info:");
+            logger.info("  - Bar width: {} pixels", barDuration * dayWidth);
+            logger.info("  - Address from project: '{}'", address);
+            logger.info("  - Address empty check: {}", address.isEmpty());
+            logger.info("  - Has description: {} (needs 3+ days)", hasDescription);
+            logger.info("  - Has address: {} (needs 4+ days)", hasAddress);
+            logger.info("  - Final display text: '{}'", displayText.replace("\n", " | "));
+            logger.info("==========================================");
+        } else {
+            // Regular debug logging
+            logger.debug("Project {} - Description: '{}', Address: '{}', Bar duration: {} days, Width: {} pixels", 
+                projectId, description, address, barDuration, barDuration * dayWidth);
+            if (!address.isEmpty()) {
+                logger.debug("Project {} has address: '{}', bar duration: {} days, will show: {}", 
+                    projectId, address, barDuration, hasAddress);
+            }
+        }
+        
+        // Use consistent, readable font size for all bars
+        double barWidth = barDuration * dayWidth;
+        double fontSize = 10 * zoomLevel; // Consistent 10px base font size
+        
+        // Adjust display text based on bar width - but preserve multi-line format
+        String finalDisplayText = displayText;
+        if (barWidth < 80) {
+            // Show only project ID or abbreviated version
+            finalDisplayText = projectId;
+            if (projectId.length() > 10 && barWidth < 60) {
+                // Show even shorter version for very narrow bars
+                String[] parts = projectId.split("-");
+                if (parts.length >= 3) {
+                    finalDisplayText = parts[0] + "-" + parts[parts.length - 1]; // e.g., "CH-093"
+                }
+            }
+        } else if (barWidth < 120) {
+            // Show only project ID for medium bars
+            finalDisplayText = projectId;
+        }
+        // For wider bars (>= 120 pixels), keep the full multi-line text as already set
+        
+        // Debug log final text
+        if (!finalDisplayText.equals(displayText)) {
+            logger.debug("Display text adjusted for bar width {} from '{}' to '{}'", 
+                barWidth, displayText.replace("\n", " | "), finalDisplayText.replace("\n", " | "));
+        }
+        
+        // Set the display text (may be abbreviated)
+        assignmentBar.setText(finalDisplayText);
         assignmentBar.getStyleClass().add("assignment-bar");
         assignmentBar.setPrefWidth(barDuration * dayWidth);
         assignmentBar.setMaxWidth(barDuration * dayWidth);
@@ -654,43 +831,6 @@ public class TimelineView extends VBox {
         assignmentBar.setTextAlignment(TextAlignment.CENTER); // Center text alignment for multi-line
         assignmentBar.setWrapText(false); // Don't wrap, we control line breaks
         assignmentBar.setPadding(new Insets(2, 4, 2, 4)); // Minimal padding for more text space
-        
-        // Dynamic font sizing based on text length and available width
-        double barWidth = barDuration * dayWidth;
-        double baseFontSize = hasDescription ? 10 * zoomLevel : 12 * zoomLevel; // Smaller base font for multi-line
-        double fontSize = baseFontSize;
-        
-        // Calculate optimal font size based on longest line and bar width
-        if (displayText != null) {
-            // Find the longest line for width calculation
-            String[] lines = displayText.split("\n");
-            int maxLineLength = 0;
-            for (String line : lines) {
-                maxLineLength = Math.max(maxLineLength, line.length());
-            }
-            
-            // Estimate character width (approximate)
-            double charWidth = fontSize * 0.6;
-            double textWidth = maxLineLength * charWidth;
-            
-            // If text is too wide, scale down the font
-            if (textWidth > barWidth - 10) { // Leave 10px padding
-                fontSize = Math.max(7, (barWidth - 10) / (maxLineLength * 0.6));
-                fontSize = Math.min(fontSize, baseFontSize); // Don't exceed base size
-            }
-            
-            // For very short bars, reduce font size more aggressively
-            if (barWidth < 60) {
-                fontSize = Math.min(fontSize, 8);
-            } else if (barWidth < 100) {
-                fontSize = Math.min(fontSize, 9);
-            }
-            
-            // Line height adjustment for multi-line text
-            if (hasDescription) {
-                assignmentBar.setStyle("-fx-line-spacing: -3;"); // Even tighter line spacing for compact display
-            }
-        }
         
         // Create left resize handle
         Region leftHandle = new Region();
@@ -717,12 +857,32 @@ public class TimelineView extends VBox {
         StackPane.setAlignment(leftHandle, Pos.CENTER_LEFT);
         StackPane.setAlignment(rightHandle, Pos.CENTER_RIGHT);
         
-        // Set left margin for positioning (adjusted for zoom)
-        double verticalMargin = (rowHeight - projectBarHeight) / 2;
-        HBox.setMargin(barContainer, new Insets(verticalMargin, 0, verticalMargin, startDayOffset * dayWidth));
+        // Note: positioning is handled by setLayoutX/Y below, not margins
+        // since rowContainer is a Pane, not an HBox
         
-        // Color coding: Conflicts take priority, then project status
-        if (isConflicted(assignment.getId())) {
+        // Color coding: Unavailability conflicts take priority, then regular conflicts, then project status
+        if (hasUnavailabilityConflict && !("SHOP".equalsIgnoreCase(project != null ? project.getProjectId() : "") || 
+            "TRAINING".equalsIgnoreCase(project != null ? project.getProjectId() : ""))) {
+            // Unavailability conflict for project assignments (not shop/training) - purple/magenta striped
+            String conflictText = displayText.contains("\n") ? 
+                "🚫 " + displayText : 
+                "🚫 " + displayText;
+            assignmentBar.setText(conflictText);
+            
+            String lineSpacing = displayText.contains("\n") ? "-fx-line-spacing: -3; " : "";
+            assignmentBar.setStyle(
+                "-fx-background-color: " +
+                    "repeating-linear-gradient(45deg, #9b59b6 0px, #9b59b6 5px, #c39bd3 5px, #c39bd3 10px); " +
+                "-fx-text-fill: white; " +
+                "-fx-font-weight: bold; " +
+                "-fx-font-size: " + fontSize + "px; " +
+                lineSpacing +
+                "-fx-border-color: #6c3483; " +
+                "-fx-border-width: 2; " +
+                "-fx-effect: dropshadow(three-pass-box, rgba(155,89,182,0.8), 6, 0.0, 0, 2);"
+            );
+            assignmentBar.getStyleClass().add("unavailability-conflict");
+        } else if (isConflicted(assignment.getId())) {
             // Conflict styling - red background with striped pattern and warning icon
             // Add warning icon only to first line (project ID)
             String conflictText = displayText.contains("\n") ? 
@@ -730,7 +890,7 @@ public class TimelineView extends VBox {
                 "⚠ " + displayText;
             assignmentBar.setText(conflictText);
             
-            String lineSpacing = hasDescription ? "-fx-line-spacing: -3; " : "";
+            String lineSpacing = displayText.contains("\n") ? "-fx-line-spacing: -3; " : "";
             assignmentBar.setStyle(
                 "-fx-background-color: " +
                     "repeating-linear-gradient(from 0px 0px to 10px 10px, " +
@@ -746,27 +906,26 @@ public class TimelineView extends VBox {
             assignmentBar.getStyleClass().add("conflict-indicator");
         } else if (project != null) {
             // Normal project status color coding
-            String lineSpacing = hasDescription ? "-fx-line-spacing: -3; " : "";
+            String lineSpacing = displayText.contains("\n") ? "-fx-line-spacing: -3; " : "";
             String baseStyle = "-fx-font-size: " + fontSize + "px; " + lineSpacing;
-            switch (project.getStatus()) {
-                case ACTIVE:
+            
+            // Special styling for SHOP and TRAINING projects
+            if ("SHOP".equalsIgnoreCase(project.getProjectId()) || "TRAINING".equalsIgnoreCase(project.getProjectId())) {
+                // Bright yellow background (#F0D000 is a cleaner, more yellow gold) with black text
+                assignmentBar.setStyle(baseStyle + "-fx-background-color: #F0D000; -fx-text-fill: black;");
+            } else {
+                // Color coding based on travel status
+                if (project.isTravel()) {
+                    // Travel projects are green
                     assignmentBar.setStyle(baseStyle + "-fx-background-color: #28a745; -fx-text-fill: white;");
-                    break;
-                case COMPLETED:
-                    assignmentBar.setStyle(baseStyle + "-fx-background-color: #007bff; -fx-text-fill: white;");
-                    break;
-                case DELAYED:
-                    assignmentBar.setStyle(baseStyle + "-fx-background-color: #ffc107; -fx-text-fill: black;");
-                    break;
-                case CANCELLED:
-                    assignmentBar.setStyle(baseStyle + "-fx-background-color: #dc3545; -fx-text-fill: white;");
-                    break;
-                default:
-                    assignmentBar.setStyle(baseStyle + "-fx-background-color: #6c757d; -fx-text-fill: white;");
+                } else {
+                    // Non-travel projects are pastel blue
+                    assignmentBar.setStyle(baseStyle + "-fx-background-color: #87CEEB; -fx-text-fill: black;");
+                }
             }
         }
         
-        // Add tooltip with assignment details including conflict warning
+        // Add comprehensive tooltip with all assignment and project details
         StringBuilder tooltipBuilder = new StringBuilder();
         
         if (isConflicted(assignment.getId())) {
@@ -774,19 +933,108 @@ public class TimelineView extends VBox {
             tooltipBuilder.append("This resource is double-booked!\n\n");
         }
         
-        tooltipBuilder.append(String.format("%s\n%s to %s", 
-            project != null ? project.getDescription() : "Unknown Project",
+        // Always show full project information in tooltip
+        if (project != null) {
+            tooltipBuilder.append("Project: ").append(project.getProjectId()).append("\n");
+            tooltipBuilder.append("Description: ").append(project.getDescription() != null ? project.getDescription() : "N/A").append("\n");
+            
+            // Add Project Manager name
+            if (project.getProjectManagerId() != null && projectManagerMap.containsKey(project.getProjectManagerId())) {
+                com.subliminalsearch.simpleprojectresourcemanager.model.ProjectManager pm = projectManagerMap.get(project.getProjectManagerId());
+                tooltipBuilder.append("Project Manager: ").append(pm.getName()).append("\n");
+            } else {
+                tooltipBuilder.append("Project Manager: Not assigned\n");
+            }
+            
+            if (project.getContactAddress() != null && !project.getContactAddress().isEmpty()) {
+                tooltipBuilder.append("Address: ").append(project.getContactAddress()).append("\n");
+            }
+            tooltipBuilder.append("Status: ").append(project.getStatus()).append("\n");
+            tooltipBuilder.append("Travel: ").append(project.isTravel() ? "Yes" : "No").append("\n");
+            
+            // Add open items count
+            if (openItemService != null) {
+                try {
+                    var openItems = openItemService.getItemsByProject(project.getId());
+                    int openItemsCount = openItems.size();
+                    tooltipBuilder.append("Open Items: ").append(openItemsCount);
+                    
+                    if (openItemsCount > 0) {
+                        // Get breakdown by status
+                        int notStarted = (int) openItems.stream()
+                            .filter(item -> item.getStatus() == com.subliminalsearch.simpleprojectresourcemanager.model.OpenItem.ItemStatus.NOT_STARTED)
+                            .count();
+                        int inProgress = (int) openItems.stream()
+                            .filter(item -> item.getStatus() == com.subliminalsearch.simpleprojectresourcemanager.model.OpenItem.ItemStatus.IN_PROGRESS)
+                            .count();
+                        int blocked = (int) openItems.stream()
+                            .filter(item -> item.getStatus() == com.subliminalsearch.simpleprojectresourcemanager.model.OpenItem.ItemStatus.BLOCKED)
+                            .count();
+                        
+                        tooltipBuilder.append(" (");
+                        boolean needComma = false;
+                        if (notStarted > 0) {
+                            tooltipBuilder.append(notStarted).append(" pending");
+                            needComma = true;
+                        }
+                        if (inProgress > 0) {
+                            if (needComma) tooltipBuilder.append(", ");
+                            tooltipBuilder.append(inProgress).append(" active");
+                            needComma = true;
+                        }
+                        if (blocked > 0) {
+                            if (needComma) tooltipBuilder.append(", ");
+                            tooltipBuilder.append(blocked).append(" blocked");
+                        }
+                        tooltipBuilder.append(")");
+                    }
+                    tooltipBuilder.append("\n");
+                } catch (Exception e) {
+                    // Don't show open items if there's an error
+                }
+            }
+        } else {
+            tooltipBuilder.append("Project: Unknown\n");
+        }
+        
+        tooltipBuilder.append("\nAssignment Details:\n");
+        tooltipBuilder.append(String.format("Dates: %s to %s\n", 
             assignment.getStartDate().format(DateTimeFormatter.ofPattern("MMM d, yyyy")),
             assignment.getEndDate().format(DateTimeFormatter.ofPattern("MMM d, yyyy"))
         ));
         
+        // Add location if present
+        if (assignment.getLocation() != null && !assignment.getLocation().trim().isEmpty()) {
+            tooltipBuilder.append("Location/Phase: ").append(assignment.getLocation()).append("\n");
+        }
+        
+        // Calculate duration
+        long duration = ChronoUnit.DAYS.between(assignment.getStartDate(), assignment.getEndDate()) + 1;
+        tooltipBuilder.append(String.format("Duration: %d days\n", duration));
+        
+        // Add resource info
+        Resource assignedResource = resources.stream()
+            .filter(r -> r.getId().equals(assignment.getResourceId()))
+            .findFirst()
+            .orElse(null);
+        if (assignedResource != null) {
+            tooltipBuilder.append("Resource: ").append(assignedResource.getName()).append("\n");
+        }
+        
         if (assignment.getNotes() != null && !assignment.getNotes().trim().isEmpty()) {
-            tooltipBuilder.append("\n").append(assignment.getNotes());
+            tooltipBuilder.append("\nNotes: ").append(assignment.getNotes());
         }
         
         javafx.scene.control.Tooltip tooltip = new javafx.scene.control.Tooltip(tooltipBuilder.toString());
+        // Configure tooltip to stay visible while hovering but hide when mouse leaves
+        tooltip.setShowDelay(javafx.util.Duration.millis(500)); // Show after 500ms hover
+        tooltip.setHideDelay(javafx.util.Duration.millis(100)); // Hide quickly after mouse leaves
+        tooltip.setShowDuration(javafx.util.Duration.seconds(3600)); // Stay visible for 1 hour while hovering
+        
         if (isConflicted(assignment.getId())) {
-            tooltip.setStyle("-fx-background-color: #ffebee; -fx-text-fill: #c62828;");
+            tooltip.setStyle("-fx-background-color: #ffebee; -fx-text-fill: #c62828; -fx-font-size: 11px;");
+        } else {
+            tooltip.setStyle("-fx-font-size: 11px;"); // Slightly larger font for readability
         }
         assignmentBar.setTooltip(tooltip);
         
@@ -809,11 +1057,53 @@ public class TimelineView extends VBox {
         // Enable drag and drop for rescheduling
         setupDragAndDrop(assignmentBar, assignment);
         
+        // Position the bar at the correct horizontal offset
+        barContainer.setLayoutX(startDayOffset * dayWidth);
+        barContainer.setLayoutY((rowHeight - projectBarHeight) / 2); // Center vertically in row
+        
         rowContainer.getChildren().add(barContainer);
     }
     
+    private boolean shouldShowAssignment(Assignment assignment, List<TechnicianUnavailability> unavailabilities) {
+        if (!showUnavailability) {
+            // If unavailability is not shown, show all assignments
+            return true;
+        }
+        
+        Project project = projects.stream()
+            .filter(p -> p.getId().equals(assignment.getProjectId()))
+            .findFirst()
+            .orElse(null);
+            
+        // Shop and Training assignments should be hidden during unavailability
+        if (project != null && ("SHOP".equalsIgnoreCase(project.getProjectId()) || 
+            "TRAINING".equalsIgnoreCase(project.getProjectId()))) {
+            // Check if this assignment overlaps with any unavailability
+            return !hasUnavailabilityConflict(assignment, unavailabilities);
+        }
+        
+        // Regular project assignments are always shown (but may be marked as conflicted)
+        return true;
+    }
+    
+    private boolean hasUnavailabilityConflict(Assignment assignment, List<TechnicianUnavailability> unavailabilities) {
+        LocalDate assignStart = assignment.getStartDate();
+        LocalDate assignEnd = assignment.getEndDate();
+        
+        for (TechnicianUnavailability unavailability : unavailabilities) {
+            LocalDate unavailStart = unavailability.getStartDate();
+            LocalDate unavailEnd = unavailability.getEndDate();
+            
+            // Check for overlap
+            if (!(assignEnd.isBefore(unavailStart) || assignStart.isAfter(unavailEnd))) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
     private void createUnavailabilityBar(TechnicianUnavailability unavailability, LocalDate timelineStart, 
-                                        LocalDate timelineEnd, HBox rowContainer, int rowIndex) {
+                                        LocalDate timelineEnd, Pane rowContainer, int rowIndex) {
         // Calculate unavailability bar positioning
         LocalDate unavailStart = unavailability.getStartDate();
         LocalDate unavailEnd = unavailability.getEndDate();
@@ -849,55 +1139,59 @@ public class TimelineView extends VBox {
         unavailabilityBar.setAlignment(Pos.CENTER);
         unavailabilityBar.setTextAlignment(TextAlignment.CENTER);
         
-        // Style based on unavailability type with different patterns
-        String baseStyle = "-fx-font-size: " + (10 * zoomLevel) + "px; ";
-        String pattern = "";
-        String textColor = "white";
+        // Style based on unavailability type - all using light violet as requested
+        String baseStyle = "-fx-font-size: " + (11 * zoomLevel) + "px; " +
+                          "-fx-font-weight: bold; ";
         
+        // Light violet color scheme for all unavailability types
+        String backgroundColor = "#E6D5FF";  // Light violet/lavender
+        String borderColor = "#B794F4";      // Slightly darker violet for border
+        String textColor = "#4A148C";        // Dark purple for text contrast
+        
+        // Optional: Keep different shades of violet for different types
         switch (unavailability.getType()) {
             case VACATION:
-                // Blue with diagonal stripes
-                pattern = "repeating-linear-gradient(45deg, #2196F3 0px, #2196F3 10px, #64B5F6 10px, #64B5F6 20px)";
+                backgroundColor = "#E6D5FF";  // Light violet
+                borderColor = "#B794F4";
                 break;
             case SICK_LEAVE:
-                // Orange with horizontal stripes
-                pattern = "repeating-linear-gradient(0deg, #FF9800 0px, #FF9800 10px, #FFB74D 10px, #FFB74D 20px)";
+                backgroundColor = "#EDE7F6";  // Very light violet
+                borderColor = "#B39DDB";
                 break;
             case TRAINING:
-                // Purple with vertical stripes
-                pattern = "repeating-linear-gradient(90deg, #9C27B0 0px, #9C27B0 10px, #BA68C8 10px, #BA68C8 20px)";
+                backgroundColor = "#F3E5F5";  // Ultra light violet
+                borderColor = "#CE93D8";
                 break;
             case PERSONAL_TIME:
-                // Green with dots pattern
-                pattern = "radial-gradient(circle, #4CAF50 30%, #81C784 30%)";
+                backgroundColor = "#E1BEE7";  // Light purple-violet
+                borderColor = "#BA68C8";
                 break;
             case OTHER_ASSIGNMENT:
-                // Brown with checkerboard
-                pattern = "repeating-conic-gradient(#795548 0% 25%, #A1887F 25% 50%)";
+                backgroundColor = "#DDD6FE";  // Light indigo-violet
+                borderColor = "#A78BFA";
                 break;
             case RECURRING:
-                // Gray diagonal stripes
-                pattern = "repeating-linear-gradient(-45deg, #757575 0px, #757575 10px, #BDBDBD 10px, #BDBDBD 20px)";
-                textColor = "black";
+                backgroundColor = "#E9D5FF";  // Light lavender
+                borderColor = "#C084FC";
                 break;
             case EMERGENCY:
-                // Red cross pattern
-                pattern = "repeating-linear-gradient(45deg, #F44336 0px, #F44336 5px, #EF9A9A 5px, #EF9A9A 10px)";
+                backgroundColor = "#FCE4EC";  // Light pink-violet
+                borderColor = "#F48FB1";
                 break;
             default:
-                // Teal with dots
-                pattern = "repeating-radial-gradient(circle at 50% 50%, #009688 0px, #009688 5px, #4DB6AC 5px, #4DB6AC 10px)";
+                backgroundColor = "#E6D5FF";  // Default light violet
+                borderColor = "#B794F4";
                 break;
         }
         
-        // Apply styling with opacity to show it's a background element
+        // Apply styling with semi-transparent background to see conflicts underneath
         unavailabilityBar.setStyle(baseStyle + 
-            "-fx-background-color: " + pattern + "; " +
+            "-fx-background-color: " + backgroundColor + "; " +
             "-fx-text-fill: " + textColor + "; " +
-            "-fx-opacity: 0.7; " +
-            "-fx-border-color: #666666; " +
-            "-fx-border-width: 1; " +
-            "-fx-border-style: dashed; " +
+            "-fx-opacity: 0.75; " +  // More transparent to show assignments underneath
+            "-fx-border-color: " + borderColor + "; " +
+            "-fx-border-width: 2; " +  // Thicker border for emphasis
+            "-fx-border-style: solid; " +  // Solid border for better visibility
             "-fx-padding: 2;"
         );
         
@@ -920,10 +1214,16 @@ public class TimelineView extends VBox {
         }
         
         Tooltip tooltip = new Tooltip(tooltipBuilder.toString());
+        // Configure tooltip to stay visible while hovering but hide when mouse leaves
+        tooltip.setShowDelay(javafx.util.Duration.millis(500)); // Show after 500ms hover
+        tooltip.setHideDelay(javafx.util.Duration.millis(100)); // Hide quickly after mouse leaves
+        tooltip.setShowDuration(javafx.util.Duration.seconds(3600)); // Stay visible for 1 hour while hovering
+        tooltip.setStyle("-fx-font-size: 11px;"); // Slightly larger font for readability
         unavailabilityBar.setTooltip(tooltip);
         
-        // Set margin for positioning
-        HBox.setMargin(unavailabilityBar, new Insets(2, 0, 2, startDayOffset * dayWidth));
+        // Position the unavailability bar at the correct horizontal offset
+        unavailabilityBar.setLayoutX(startDayOffset * dayWidth);
+        unavailabilityBar.setLayoutY(2); // Small margin from top
         
         rowContainer.getChildren().add(unavailabilityBar);
     }
@@ -1011,6 +1311,22 @@ public class TimelineView extends VBox {
             });
             contextMenu.getItems().add(projectDetailsItem);
             
+            // Edit Project & Client Info menu item
+            MenuItem editProjectItem = new MenuItem("Edit Project & Client Info...");
+            editProjectItem.setOnAction(e -> {
+                showEditProjectDialog(project, assignment);
+            });
+            contextMenu.getItems().add(editProjectItem);
+            
+            // Open Items menu item
+            MenuItem openItemsItem = new MenuItem("Manage Open Items...");
+            openItemsItem.setOnAction(e -> {
+                if (onManageOpenItems != null) {
+                    onManageOpenItems.accept(project);
+                }
+            });
+            contextMenu.getItems().add(openItemsItem);
+            
             // Track Financials menu item
             MenuItem trackFinancialsItem = new MenuItem("Track Financials");
             trackFinancialsItem.setOnAction(e -> {
@@ -1070,6 +1386,59 @@ public class TimelineView extends VBox {
                 }
             });
             contextMenu.getItems().add(viewInReportCenterItem);
+            
+            // Add Filter submenu
+            contextMenu.getItems().add(new SeparatorMenuItem());
+            
+            Menu filterMenu = new Menu("Filter Timeline");
+            
+            MenuItem filterByProject = new MenuItem("Filter by This Project");
+            filterByProject.setOnAction(e -> {
+                if (onApplyFilter != null) {
+                    onApplyFilter.accept("project", project.getProjectId());
+                }
+            });
+            filterMenu.getItems().add(filterByProject);
+            
+            MenuItem filterByStatus = new MenuItem("Filter by Status: " + project.getStatus().getDisplayName());
+            filterByStatus.setOnAction(e -> {
+                if (onApplyFilter != null) {
+                    onApplyFilter.accept("status", project.getStatus());
+                }
+            });
+            filterMenu.getItems().add(filterByStatus);
+            
+            if (project.getProjectManagerId() != null) {
+                MenuItem filterByManager = new MenuItem("Filter by Project Manager");
+                filterByManager.setOnAction(e -> {
+                    if (onApplyFilter != null) {
+                        onApplyFilter.accept("manager", project.getProjectManagerId());
+                    }
+                });
+                filterMenu.getItems().add(filterByManager);
+            }
+            
+            contextMenu.getItems().add(filterMenu);
+        }
+        
+        // Add resource filter if we have the resource
+        Resource resource = null;
+        for (Resource r : resources) {
+            if (r.getId().equals(assignment.getResourceId())) {
+                resource = r;
+                break;
+            }
+        }
+        
+        if (resource != null) {
+            final String resourceName = resource.getName();
+            MenuItem filterByResource = new MenuItem("Filter by Resource: " + resourceName);
+            filterByResource.setOnAction(e -> {
+                if (onApplyFilter != null) {
+                    onApplyFilter.accept("resource", resourceName);
+                }
+            });
+            contextMenu.getItems().add(filterByResource);
         }
         
         // Separator
@@ -1083,6 +1452,29 @@ public class TimelineView extends VBox {
                 onEditAssignment.accept(assignment);
             }
         });
+        
+        // Extend to Project Duration menu item (if assignment duration != project duration)
+        if (project != null && project.getStartDate() != null && project.getEndDate() != null) {
+            LocalDate projStart = project.getStartDate();
+            LocalDate projEnd = project.getEndDate();
+            if (!assignment.getStartDate().equals(projStart) || !assignment.getEndDate().equals(projEnd)) {
+                MenuItem extendItem = new MenuItem("Extend to Full Project Duration");
+                long projDays = java.time.temporal.ChronoUnit.DAYS.between(projStart, projEnd) + 1;
+                long assignDays = java.time.temporal.ChronoUnit.DAYS.between(assignment.getStartDate(), assignment.getEndDate()) + 1;
+                extendItem.setText(String.format("Extend to Full Project Duration (%d → %d days)", assignDays, projDays));
+                extendItem.setOnAction(e -> {
+                    // Update assignment to match project dates
+                    assignment.setStartDate(projStart);
+                    assignment.setEndDate(projEnd);
+                    if (onEditAssignment != null) {
+                        onEditAssignment.accept(assignment);
+                    }
+                    // Refresh the timeline to show the extended assignment
+                    refreshTimeline();
+                });
+                contextMenu.getItems().add(extendItem);
+            }
+        }
         
         // Duplicate menu item
         MenuItem duplicateItem = new MenuItem("Duplicate Assignment");
@@ -1108,6 +1500,35 @@ public class TimelineView extends VBox {
         }
         
         contextMenu.getItems().addAll(editItem, duplicateItem, deleteItem);
+        
+        // Add delete project option in separate section
+        if (project != null) {
+            contextMenu.getItems().add(new SeparatorMenuItem());
+            
+            // Count assignments for this project
+            long assignmentCount = assignments.stream()
+                .filter(a -> a.getProjectId().equals(project.getId()))
+                .count();
+            
+            MenuItem deleteProjectItem = new MenuItem("DELETE PROJECT");
+            deleteProjectItem.setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
+            deleteProjectItem.setOnAction(e -> {
+                // If project has assignments, use the comprehensive delete
+                if (assignmentCount > 0) {
+                    if (onDeleteProjectWithAssignments != null) {
+                        onDeleteProjectWithAssignments.accept(project);
+                    }
+                } else {
+                    // No assignments, just delete the project
+                    if (onDeleteProject != null) {
+                        onDeleteProject.accept(project);
+                    }
+                }
+            });
+            
+            contextMenu.getItems().add(deleteProjectItem);
+        }
+        
         contextMenu.show(assignmentBar, screenX, screenY);
     }
     
@@ -1119,6 +1540,34 @@ public class TimelineView extends VBox {
     public ObservableList<Assignment> getAssignments() { return assignments; }
     public ObservableList<TechnicianUnavailability> getUnavailabilities() { return unavailabilities; }
     public ObservableList<CompanyHoliday> getCompanyHolidays() { return companyHolidays; }
+    public ObservableList<com.subliminalsearch.simpleprojectresourcemanager.model.ProjectManager> getProjectManagers() { return projectManagers; }
+    
+    public void setProjectManagers(List<com.subliminalsearch.simpleprojectresourcemanager.model.ProjectManager> managers) {
+        this.projectManagers.clear();
+        this.projectManagers.addAll(managers);
+        this.projectManagerMap.clear();
+        for (com.subliminalsearch.simpleprojectresourcemanager.model.ProjectManager pm : managers) {
+            this.projectManagerMap.put(pm.getId(), pm);
+        }
+    }
+    
+    public void setUtilizationSettings(UtilizationSettings settings) {
+        this.utilizationSettings = settings;
+        refreshTimeline(); // Refresh to apply new settings
+    }
+    
+    public UtilizationSettings getUtilizationSettings() {
+        return utilizationSettings;
+    }
+    
+    public void setShowUnavailability(boolean showUnavailability) {
+        this.showUnavailability = showUnavailability;
+        refreshTimeline(); // Refresh to apply visibility change
+    }
+    
+    public boolean isShowUnavailability() {
+        return showUnavailability;
+    }
     
     // Utility methods
     public void scrollToDate(LocalDate date) {
@@ -1244,13 +1693,153 @@ public class TimelineView extends VBox {
         return (assignedDays * 100.0) / totalDays;
     }
     
+    // Calculate both utilization and billable percentages
+    private ResourceMetrics calculateResourceMetrics(Resource resource, LocalDate start, LocalDate end) {
+        // Calculate available days based on utilization settings
+        long availableDays = calculateAvailableDays(start, end);
+        
+        // Get all assignments for this resource in the timeline period
+        List<Assignment> resourceAssignments = assignments.stream()
+            .filter(a -> a.getResourceId().equals(resource.getId()))
+            .filter(a -> datesOverlap(a.getStartDate(), a.getEndDate(), start, end))
+            .toList();
+        
+        // Calculate total assigned days and billable days
+        long totalAssignedDays = 0;
+        long billableDays = 0;
+        long shopDays = 0;
+        long trainingDays = 0;
+        
+        for (Assignment assignment : resourceAssignments) {
+            LocalDate assignStart = assignment.getStartDate().isBefore(start) ? start : assignment.getStartDate();
+            LocalDate assignEnd = assignment.getEndDate().isAfter(end) ? end : assignment.getEndDate();
+            
+            // Count only working days if configured
+            long days = 0;
+            if (utilizationSettings.getCalculationMethod() == UtilizationSettings.CalculationMethod.WORKING_DAYS) {
+                days = calculateWorkingDays(assignStart, assignEnd);
+            } else {
+                days = ChronoUnit.DAYS.between(assignStart, assignEnd) + 1;
+            }
+            
+            // Check if this is a SHOP/TRAINING assignment
+            Project project = projects.stream()
+                .filter(p -> p.getId().equals(assignment.getProjectId()))
+                .findFirst()
+                .orElse(null);
+                
+            if (project != null) {
+                String projectId = project.getProjectId();
+                if ("SHOP".equalsIgnoreCase(projectId)) {
+                    shopDays += days;
+                    // Count SHOP as utilized based on settings
+                    if (utilizationSettings.isCountShopAsUtilized()) {
+                        totalAssignedDays += days;
+                    }
+                } else if ("TRAINING".equalsIgnoreCase(projectId)) {
+                    trainingDays += days;
+                    // Count TRAINING as utilized based on settings
+                    if (utilizationSettings.isCountTrainingAsUtilized()) {
+                        totalAssignedDays += days;
+                    }
+                } else {
+                    // Regular project - always counts as utilized and billable
+                    totalAssignedDays += days;
+                    billableDays += days;
+                }
+            } else {
+                // If project not found, assume it's billable
+                totalAssignedDays += days;
+                billableDays += days;
+            }
+        }
+        
+        // Calculate percentages
+        double utilizationPercent = availableDays > 0 ? (totalAssignedDays * 100.0) / availableDays : 0;
+        double billablePercent = totalAssignedDays > 0 ? (billableDays * 100.0) / totalAssignedDays : 0;
+        
+        return new ResourceMetrics(utilizationPercent, billablePercent, totalAssignedDays, billableDays, shopDays);
+    }
+    
+    // Calculate available days based on utilization settings
+    private long calculateAvailableDays(LocalDate start, LocalDate end) {
+        if (utilizationSettings.getCalculationMethod() == UtilizationSettings.CalculationMethod.CALENDAR_DAYS) {
+            // All calendar days
+            return ChronoUnit.DAYS.between(start, end) + 1;
+        } else {
+            // Working days only
+            return calculateWorkingDays(start, end);
+        }
+    }
+    
+    // Calculate working days (excluding weekends and optionally holidays)
+    private long calculateWorkingDays(LocalDate start, LocalDate end) {
+        long workingDays = 0;
+        LocalDate current = start;
+        
+        while (!current.isAfter(end)) {
+            boolean isWorkingDay = true;
+            
+            // Check weekends
+            if (current.getDayOfWeek() == DayOfWeek.SATURDAY) {
+                isWorkingDay = utilizationSettings.isIncludeSaturdays();
+            } else if (current.getDayOfWeek() == DayOfWeek.SUNDAY) {
+                isWorkingDay = utilizationSettings.isIncludeWeekends();
+            }
+            
+            // Check holidays
+            if (isWorkingDay && !utilizationSettings.isIncludeHolidays()) {
+                LocalDate currentDate = current;
+                boolean isHoliday = companyHolidays.stream()
+                    .anyMatch(h -> h.getDate().equals(currentDate) && h.isActive());
+                if (isHoliday) {
+                    isWorkingDay = false;
+                }
+            }
+            
+            if (isWorkingDay) {
+                workingDays++;
+            }
+            
+            current = current.plusDays(1);
+        }
+        
+        return workingDays;
+    }
+    
+    // Inner class to hold resource metrics
+    private static class ResourceMetrics {
+        final double utilizationPercent;
+        final double billablePercent;
+        final long totalAssignedDays;
+        final long billableDays;
+        final long shopDays;
+        
+        ResourceMetrics(double utilizationPercent, double billablePercent, 
+                       long totalAssignedDays, long billableDays, long shopDays) {
+            this.utilizationPercent = utilizationPercent;
+            this.billablePercent = billablePercent;
+            this.totalAssignedDays = totalAssignedDays;
+            this.billableDays = billableDays;
+            this.shopDays = shopDays;
+        }
+    }
+    
     // Context menu callback setters
     public void setOnEditProject(Consumer<Project> onEditProject) {
         this.onEditProject = onEditProject;
     }
     
+    public void setOnManageOpenItems(Consumer<Project> onManageOpenItems) {
+        this.onManageOpenItems = onManageOpenItems;
+    }
+    
     public void setOnDeleteProject(Consumer<Project> onDeleteProject) {
         this.onDeleteProject = onDeleteProject;
+    }
+    
+    public void setOnDeleteProjectWithAssignments(Consumer<Project> onDeleteProjectWithAssignments) {
+        this.onDeleteProjectWithAssignments = onDeleteProjectWithAssignments;
     }
     
     public void setOnEditResource(Consumer<Resource> onEditResource) {
@@ -1305,6 +1894,10 @@ public class TimelineView extends VBox {
         this.onViewInReportCenter = onViewInReportCenter;
     }
     
+    public void setOnApplyFilter(BiConsumer<String, Object> onApplyFilter) {
+        this.onApplyFilter = onApplyFilter;
+    }
+    
     private void setupEdgeResize(Region leftHandle, Region rightHandle, StackPane barContainer, 
                                   Assignment assignment, Label assignmentBar, LocalDate timelineStart) {
         // Store initial drag positions
@@ -1319,8 +1912,7 @@ public class TimelineView extends VBox {
         leftHandle.setOnMousePressed(event -> {
             // Store initial positions
             dragStartX[0] = event.getSceneX();
-            Insets margin = HBox.getMargin(barContainer);
-            initialLeft[0] = margin.getLeft();
+            initialLeft[0] = barContainer.getLayoutX();
             initialWidth[0] = barContainer.getWidth();
             
             // Get the current assignment dates (may have been updated from previous drags)
@@ -1370,9 +1962,7 @@ public class TimelineView extends VBox {
             
             if (newWidth >= dayWidth) { // Minimum 1 day width
                 // Update visual position
-                Insets margin = HBox.getMargin(barContainer);
-                HBox.setMargin(barContainer, new Insets(margin.getTop(), margin.getRight(), 
-                                                       margin.getBottom(), snappedLeft));
+                barContainer.setLayoutX(snappedLeft);
                 barContainer.setPrefWidth(newWidth);
                 barContainer.setMaxWidth(newWidth);
                 barContainer.setMinWidth(newWidth);
@@ -1390,16 +1980,15 @@ public class TimelineView extends VBox {
         
         leftHandle.setOnMouseReleased(event -> {
             // Calculate final position
-            Insets margin = HBox.getMargin(barContainer);
-            double finalLeft = margin.getLeft();
+            double finalLeft = barContainer.getLayoutX();
             // The position should already be snapped to a day boundary, so just divide
             int dayIndex = (int) Math.round(finalLeft / dayWidth);
             
             // Calculate new start date
             LocalDate newStartDate = timelineStart.plusDays(dayIndex);
             
-            // Keep the same end date
-            LocalDate endDate = assignment.getEndDate();
+            // Keep the same end date from the current assignment (may have been updated)
+            LocalDate endDate = currentAssignment[0].getEndDate();
             
             logger.info("LEFT EDGE DRAG END - Assignment ID: {}", assignment.getId());
             logger.info("  Final left margin: {}, Day index: {}, dayWidth: {}", 
@@ -1455,11 +2044,16 @@ public class TimelineView extends VBox {
             // Store initial positions
             rightDragStartX[0] = event.getSceneX();
             rightInitialWidth[0] = barContainer.getWidth();
-            Insets margin = HBox.getMargin(barContainer);
-            rightInitialLeft[0] = margin.getLeft();
+            rightInitialLeft[0] = barContainer.getLayoutX();
+            
+            // Get the current assignment dates (may have been updated from previous drags)
+            Assignment current = (Assignment) barContainer.getUserData();
+            if (current == null) {
+                current = assignment;
+            }
             
             logger.info("RIGHT EDGE DRAG START - Assignment ID: {}, Current dates: {} to {}", 
-                assignment.getId(), assignment.getStartDate(), assignment.getEndDate());
+                current.getId(), current.getStartDate(), current.getEndDate());
             logger.info("  Initial scene X: {}, Container width: {}, Left margin: {}", 
                 rightDragStartX[0], rightInitialWidth[0], rightInitialLeft[0]);
             event.consume();
@@ -1505,16 +2099,15 @@ public class TimelineView extends VBox {
         
         rightHandle.setOnMouseReleased(event -> {
             // Calculate final position
-            Insets margin = HBox.getMargin(barContainer);
             double finalWidth = barContainer.getWidth();
-            double rightEdgePosition = margin.getLeft() + finalWidth;
+            double rightEdgePosition = barContainer.getLayoutX() + finalWidth;
             int dayIndex = (int) Math.round(rightEdgePosition / dayWidth);
             
             // Calculate new end date (subtract 1 because end date is inclusive)
             LocalDate newEndDate = timelineStart.plusDays(dayIndex - 1);
             
-            // Keep the same start date
-            LocalDate startDate = assignment.getStartDate();
+            // Keep the same start date from the current assignment (may have been updated)
+            LocalDate startDate = currentAssignment[0].getStartDate();
             
             logger.info("RIGHT EDGE DRAG END - Final width: {}, Right edge position: {}, Day index: {}", 
                 finalWidth, rightEdgePosition, dayIndex);
@@ -1602,6 +2195,297 @@ public class TimelineView extends VBox {
             
             event.consume();
         });
+    }
+    
+    private List<Project> findUnassignedProjects(LocalDate start, LocalDate end) {
+        // Get all project IDs that have assignments
+        Set<Long> assignedProjectIds = assignments.stream()
+            .map(Assignment::getProjectId)
+            .collect(Collectors.toSet());
+        
+        // Log details for debugging
+        logger.debug("Total projects in timeline: {}", projects.size());
+        logger.debug("Projects with assignments: {}", assignedProjectIds.size());
+        
+        // Find projects without assignments that overlap with the timeline date range
+        List<Project> unassigned = projects.stream()
+            .filter(p -> !assignedProjectIds.contains(p.getId()))
+            .filter(p -> {
+                // Check if project dates overlap with timeline range
+                LocalDate projectStart = p.getStartDate();
+                LocalDate projectEnd = p.getEndDate();
+                return projectStart != null && projectEnd != null &&
+                       !(projectEnd.isBefore(start) || projectStart.isAfter(end));
+            })
+            .sorted(Comparator.comparing(Project::getStartDate))
+            .collect(Collectors.toList());
+            
+        logger.debug("Found {} unassigned projects in date range", unassigned.size());
+        for (Project p : unassigned) {
+            logger.debug("Unassigned project: {} - {} (ID: {})", p.getProjectId(), p.getDescription(), p.getId());
+        }
+        
+        return unassigned;
+    }
+    
+    private void createUnassignedProjectRow(Project unassignedProject, LocalDate start, LocalDate end, int rowIndex) {
+        // Create label for this unassigned project
+        StackPane labelContainer = new StackPane();
+        labelContainer.setPrefWidth(resourceLabelWidth);
+        labelContainer.setMaxWidth(resourceLabelWidth);
+        labelContainer.setMinWidth(resourceLabelWidth);
+        labelContainer.setPadding(new Insets(3, 5, 3, 5));
+        labelContainer.setMinHeight(rowHeight);
+        labelContainer.setPrefHeight(rowHeight);
+        labelContainer.setMaxHeight(rowHeight);
+        labelContainer.setAlignment(Pos.CENTER_LEFT);
+        
+        // Style for unassigned project row
+        labelContainer.setStyle("-fx-background-color: #fff3cd; -fx-border-color: #ffc107; -fx-border-width: 0 0 1 0;");
+        
+        // Create label showing project info with project manager on second line
+        String projectInfo = unassignedProject.getProjectId();
+        if (unassignedProject.getDescription() != null && !unassignedProject.getDescription().isEmpty()) {
+            String desc = unassignedProject.getDescription();
+            if (desc.length() > 20) {
+                desc = desc.substring(0, 20) + "...";
+            }
+            projectInfo = unassignedProject.getProjectId() + " - " + desc;
+        }
+        
+        // Get project manager name if available
+        String pmName = "No PM Assigned";
+        if (unassignedProject.getProjectManagerId() != null && projectManagerMap.containsKey(unassignedProject.getProjectManagerId())) {
+            com.subliminalsearch.simpleprojectresourcemanager.model.ProjectManager pm = projectManagerMap.get(unassignedProject.getProjectManagerId());
+            pmName = "PM: " + pm.getName();
+        }
+        
+        // Create two-line label text
+        String labelText = "Unassigned: " + projectInfo + "\n" + pmName;
+        
+        Label unassignedLabel = new Label(labelText);
+        unassignedLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: #856404;");
+        unassignedLabel.setAlignment(Pos.CENTER_LEFT);
+        unassignedLabel.setPrefWidth(resourceLabelWidth - 10);
+        unassignedLabel.setMaxWidth(resourceLabelWidth - 10);
+        unassignedLabel.setPrefHeight(rowHeight - 10);
+        unassignedLabel.setPadding(new Insets(5, 5, 5, 5));
+        unassignedLabel.setTextOverrun(OverrunStyle.ELLIPSIS);
+        
+        // Add tooltip with full project details
+        String pmTooltipName = "Not assigned";
+        if (unassignedProject.getProjectManagerId() != null && projectManagerMap.containsKey(unassignedProject.getProjectManagerId())) {
+            pmTooltipName = projectManagerMap.get(unassignedProject.getProjectManagerId()).getName();
+        }
+        
+        Tooltip tooltip = new Tooltip("Project: " + unassignedProject.getProjectId() + 
+                                     "\nDescription: " + unassignedProject.getDescription() +
+                                     "\nProject Manager: " + pmTooltipName +
+                                     "\nStart: " + unassignedProject.getStartDate() +
+                                     "\nEnd: " + unassignedProject.getEndDate() +
+                                     "\n\nDrag to assign to a resource");
+        unassignedLabel.setTooltip(tooltip);
+        
+        labelContainer.getChildren().add(unassignedLabel);
+        fixedResourceContent.getChildren().add(labelContainer);
+        
+        // Create timeline row cells
+        long dayCount = ChronoUnit.DAYS.between(start, end) + 1;
+        for (long i = 0; i < dayCount; i++) {
+            LocalDate date = start.plusDays(i);
+            Pane dayCell = new Pane();
+            dayCell.setPrefHeight(rowHeight);
+            dayCell.setMinHeight(rowHeight);
+            dayCell.setMaxHeight(rowHeight);
+            dayCell.setPrefWidth(dayWidth);
+            dayCell.setMinWidth(dayWidth);
+            dayCell.setMaxWidth(dayWidth);
+            
+            // Light yellow background for unassigned project row
+            boolean isWeekend = date.getDayOfWeek() == java.time.DayOfWeek.SATURDAY || 
+                               date.getDayOfWeek() == java.time.DayOfWeek.SUNDAY;
+            boolean isHoliday = companyHolidays != null && companyHolidays.stream()
+                .anyMatch(h -> h.getDate().equals(date));
+            boolean isToday = date.equals(LocalDate.now());
+            
+            String bgColor;
+            if (isToday) {
+                bgColor = "#d4d4d4"; // Darker gray for today
+            } else if (isHoliday) {
+                bgColor = "#ffe8ec"; // Light pink for holidays
+            } else if (isWeekend) {
+                bgColor = "#fff8e1"; // Light yellow-blue for weekends
+            } else {
+                bgColor = "#fffbf0"; // Very light yellow for regular days
+            }
+            
+            // Only use bottom border to avoid cumulative width drift from right borders
+            dayCell.setStyle("-fx-background-color: " + bgColor + "; -fx-border-color: #e0e0e0; -fx-border-width: 0 0 1 0;");
+            timelineGrid.add(dayCell, (int) i, rowIndex);
+        }
+        
+        // Create a transparent row container for this project bar
+        Pane rowContainer = new Pane();
+        rowContainer.setPrefHeight(rowHeight);
+        rowContainer.setMinHeight(rowHeight);
+        rowContainer.setMaxHeight(rowHeight);
+        rowContainer.setPickOnBounds(false);
+        
+        // Add the single project bar
+        createUnassignedProjectBar(unassignedProject, start, end, rowContainer);
+        
+        // Add the row container on top of the day cells
+        timelineGrid.add(rowContainer, 0, rowIndex, (int) dayCount, 1);
+    }
+    
+    private void createUnassignedProjectBar(Project project, LocalDate timelineStart, LocalDate timelineEnd, Pane rowContainer) {
+        LocalDate projectStart = project.getStartDate();
+        LocalDate projectEnd = project.getEndDate();
+        
+        if (projectStart == null || projectEnd == null) {
+            return;
+        }
+        
+        // Calculate visible dates
+        LocalDate visibleStart = projectStart.isBefore(timelineStart) ? timelineStart : projectStart;
+        LocalDate visibleEnd = projectEnd.isAfter(timelineEnd) ? timelineEnd : projectEnd;
+        
+        long dayOffset = ChronoUnit.DAYS.between(timelineStart, visibleStart);
+        long duration = ChronoUnit.DAYS.between(visibleStart, visibleEnd) + 1;
+        
+        if (dayOffset < 0 || duration <= 0) {
+            return;
+        }
+        
+        // Create project bar with placeholder styling
+        Label projectBar = new Label();
+        String displayText = project.getProjectId() + " - Needs Resources";
+        if (project.getDescription() != null && !project.getDescription().isEmpty()) {
+            displayText = project.getProjectId() + " | " + project.getDescription() + " (Unassigned)";
+        }
+        projectBar.setText(displayText);
+        
+        // Placeholder styling - dashed border, semi-transparent
+        projectBar.setStyle(
+            "-fx-background-color: rgba(255, 193, 7, 0.3); " +
+            "-fx-border-color: #ff9800; " +
+            "-fx-border-width: 2; " +
+            "-fx-border-style: dashed; " +
+            "-fx-padding: 3 6 3 6; " +
+            "-fx-font-size: 11px; " +
+            "-fx-text-fill: #856404; " +
+            "-fx-font-weight: bold;"
+        );
+        
+        projectBar.setPrefHeight(projectBarHeight);
+        projectBar.setMaxHeight(projectBarHeight);
+        projectBar.setMinHeight(projectBarHeight);
+        projectBar.setPrefWidth(duration * dayWidth - 4);
+        projectBar.setMaxWidth(duration * dayWidth - 4);
+        projectBar.setAlignment(Pos.CENTER_LEFT);
+        projectBar.setTextOverrun(OverrunStyle.ELLIPSIS);
+        
+        // Position the bar
+        projectBar.setLayoutX(dayOffset * dayWidth + 2);
+        projectBar.setLayoutY((rowHeight - projectBarHeight) / 2);
+        
+        // Add tooltip
+        Tooltip tooltip = new Tooltip(
+            "Project: " + project.getProjectId() + "\n" +
+            "Description: " + (project.getDescription() != null ? project.getDescription() : "N/A") + "\n" +
+            "Duration: " + project.getStartDate() + " to " + project.getEndDate() + "\n" +
+            "Status: UNASSIGNED - Click to assign resources"
+        );
+        Tooltip.install(projectBar, tooltip);
+        
+        // Make it clickable to open assignment dialog
+        projectBar.setCursor(Cursor.HAND);
+        projectBar.setOnMouseClicked(event -> {
+            if (event.getButton() == MouseButton.PRIMARY && event.getClickCount() == 2) {
+                // Double-click to open assignment dialog
+                if (onEditAssignment != null) {
+                    // Create a dummy assignment to trigger the assignment dialog
+                    Assignment dummyAssignment = new Assignment();
+                    dummyAssignment.setProjectId(project.getId());
+                    dummyAssignment.setStartDate(project.getStartDate());
+                    dummyAssignment.setEndDate(project.getEndDate());
+                    onEditAssignment.accept(dummyAssignment);
+                }
+            }
+        });
+        
+        // Add context menu
+        ContextMenu contextMenu = new ContextMenu();
+        
+        MenuItem assignResources = new MenuItem("Assign Resources...");
+        assignResources.setOnAction(e -> {
+            if (onEditAssignment != null) {
+                Assignment dummyAssignment = new Assignment();
+                dummyAssignment.setProjectId(project.getId());
+                dummyAssignment.setStartDate(project.getStartDate());
+                dummyAssignment.setEndDate(project.getEndDate());
+                onEditAssignment.accept(dummyAssignment);
+            }
+        });
+        
+        MenuItem editProject = new MenuItem("Edit Project...");
+        editProject.setOnAction(e -> {
+            logger.info("Edit Project menu clicked for project {} with travel={}", project.getProjectId(), project.isTravel());
+            if (onEditProject != null) {
+                onEditProject.accept(project);
+            }
+        });
+        
+        MenuItem openItems = new MenuItem("Manage Open Items...");
+        openItems.setOnAction(e -> {
+            logger.info("Manage Open Items menu clicked for project {}", project.getProjectId());
+            if (onManageOpenItems != null) {
+                onManageOpenItems.accept(project);
+            }
+        });
+        
+        // Add Filter submenu
+        Menu filterMenu = new Menu("Filter Timeline");
+        
+        MenuItem filterByProject = new MenuItem("Filter by This Project");
+        filterByProject.setOnAction(e -> {
+            if (onApplyFilter != null) {
+                onApplyFilter.accept("project", project.getProjectId());
+            }
+        });
+        filterMenu.getItems().add(filterByProject);
+        
+        MenuItem filterByStatus = new MenuItem("Filter by Status: " + project.getStatus().getDisplayName());
+        filterByStatus.setOnAction(e -> {
+            if (onApplyFilter != null) {
+                onApplyFilter.accept("status", project.getStatus());
+            }
+        });
+        filterMenu.getItems().add(filterByStatus);
+        
+        if (project.getProjectManagerId() != null) {
+            MenuItem filterByManager = new MenuItem("Filter by Project Manager");
+            filterByManager.setOnAction(e -> {
+                if (onApplyFilter != null) {
+                    onApplyFilter.accept("manager", project.getProjectManagerId());
+                }
+            });
+            filterMenu.getItems().add(filterByManager);
+        }
+        
+        MenuItem clearFilters = new MenuItem("Clear All Filters");
+        clearFilters.setOnAction(e -> {
+            if (onApplyFilter != null) {
+                onApplyFilter.accept("clear", null);
+            }
+        });
+        filterMenu.getItems().addAll(new SeparatorMenuItem(), clearFilters);
+        
+        contextMenu.getItems().addAll(assignResources, new SeparatorMenuItem(), editProject, openItems, new SeparatorMenuItem(), filterMenu);
+        projectBar.setOnContextMenuRequested(e -> contextMenu.show(projectBar, e.getScreenX(), e.getScreenY()));
+        
+        // Add the project bar to the row container
+        rowContainer.getChildren().add(projectBar);
     }
     
     private void setupDropTargets() {
@@ -1854,29 +2738,133 @@ public class TimelineView extends VBox {
             // Create financial service
             FinancialService financialService = new FinancialService(dbConfig.getDataSource(), projectRepository);
             
-            // Show the dialog
-            FinancialTrackingDialog dialog = new FinancialTrackingDialog(project, financialService);
-            
-            // Set owner window if available
-            if (getScene() != null && getScene().getWindow() != null) {
-                dialog.initOwner(getScene().getWindow());
-                
-                // Match the parent window size
-                Stage parentStage = (Stage) getScene().getWindow();
-                dialog.setWidth(parentStage.getWidth() * 0.9);  // 90% of parent width
-                dialog.setHeight(parentStage.getHeight() * 0.99); // 99% of parent height (nearly full height)
-                
-                // Center the dialog on the parent window
-                dialog.setX(parentStage.getX() + (parentStage.getWidth() - dialog.getWidth()) / 2);
-                dialog.setY(parentStage.getY() + (parentStage.getHeight() - dialog.getHeight()) / 2);
-            }
-            
+            // Show the dialog with owner window for proper screen positioning
+            javafx.stage.Window owner = getScene() != null ? getScene().getWindow() : null;
+            FinancialTrackingDialog dialog = new FinancialTrackingDialog(project, financialService, owner);
             dialog.showAndWait();
         } catch (Exception e) {
-            Alert alert = new Alert(Alert.AlertType.ERROR);
+            javafx.stage.Window errorOwner = getScene() != null ? getScene().getWindow() : null;
+            Alert alert = DialogUtils.createScreenAwareAlert(Alert.AlertType.ERROR, errorOwner);
             alert.setTitle("Error");
             alert.setHeaderText("Failed to open Financial Tracking");
             alert.setContentText(e.getMessage());
+            alert.showAndWait();
+        }
+    }
+    
+    private void showEditProjectDialog(Project project, Assignment assignment) {
+        try {
+            // Get the data source from the configuration
+            com.subliminalsearch.simpleprojectresourcemanager.config.DatabaseConfig dbConfig = 
+                new com.subliminalsearch.simpleprojectresourcemanager.config.DatabaseConfig();
+            
+            // Get the project repository
+            com.subliminalsearch.simpleprojectresourcemanager.repository.ProjectRepository projectRepository = 
+                new com.subliminalsearch.simpleprojectresourcemanager.repository.ProjectRepository(dbConfig.getDataSource());
+            
+            // Get project managers
+            com.subliminalsearch.simpleprojectresourcemanager.repository.ProjectManagerRepository pmRepository = 
+                new com.subliminalsearch.simpleprojectresourcemanager.repository.ProjectManagerRepository(dbConfig.getDataSource());
+            List<com.subliminalsearch.simpleprojectresourcemanager.model.ProjectManager> managers = pmRepository.findAll();
+            
+            // Create a modified copy of the project with assignment dates for display
+            Project projectCopy = new Project();
+            projectCopy.setId(project.getId());
+            projectCopy.setProjectId(project.getProjectId());
+            projectCopy.setDescription(project.getDescription());
+            projectCopy.setProjectManagerId(project.getProjectManagerId());
+            projectCopy.setStatus(project.getStatus());
+            
+            // Use assignment dates for this edit session
+            projectCopy.setStartDate(assignment.getStartDate());
+            projectCopy.setEndDate(assignment.getEndDate());
+            
+            // Copy all client fields
+            projectCopy.setContactName(project.getContactName());
+            projectCopy.setContactEmail(project.getContactEmail());
+            projectCopy.setContactPhone(project.getContactPhone());
+            projectCopy.setContactCompany(project.getContactCompany());
+            projectCopy.setContactRole(project.getContactRole());
+            projectCopy.setContactAddress(project.getContactAddress());
+            projectCopy.setClientProjectId(project.getClientProjectId());
+            projectCopy.setClientProjectDescription(project.getClientProjectDescription());
+            projectCopy.setSendReports(project.isSendReports());
+            projectCopy.setReportFrequency(project.getReportFrequency());
+            
+            // Copy financial fields
+            projectCopy.setBudgetAmount(project.getBudgetAmount());
+            projectCopy.setActualCost(project.getActualCost());
+            projectCopy.setRevenueAmount(project.getRevenueAmount());
+            projectCopy.setCurrencyCode(project.getCurrencyCode());
+            projectCopy.setLaborCost(project.getLaborCost());
+            projectCopy.setMaterialCost(project.getMaterialCost());
+            projectCopy.setTravelCost(project.getTravelCost());
+            projectCopy.setOtherCost(project.getOtherCost());
+            projectCopy.setCostNotes(project.getCostNotes());
+            
+            // Copy travel field (CRITICAL: was missing and causing travel checkbox bug!)
+            projectCopy.setTravel(project.isTravel());
+            
+            // Copy timestamps
+            projectCopy.setCreatedAt(project.getCreatedAt());
+            projectCopy.setUpdatedAt(project.getUpdatedAt());
+            
+            // Create dialog with assignment dates
+            com.subliminalsearch.simpleprojectresourcemanager.dialog.ProjectDialog dialog = 
+                new com.subliminalsearch.simpleprojectresourcemanager.dialog.ProjectDialog(projectCopy, projectRepository, managers);
+            
+            // Set dialog title to indicate editing from assignment
+            dialog.setTitle("Edit Project (Assignment: " + 
+                assignment.getStartDate().format(java.time.format.DateTimeFormatter.ofPattern("MMM d")) + " - " +
+                assignment.getEndDate().format(java.time.format.DateTimeFormatter.ofPattern("MMM d, yyyy")) + ")");
+            
+            javafx.stage.Window owner = getScene() != null ? getScene().getWindow() : null;
+            com.subliminalsearch.simpleprojectresourcemanager.util.DialogUtils.initializeDialog(dialog, owner);
+            
+            Optional<Project> result = dialog.showAndWait();
+            if (result.isPresent()) {
+                Project updatedProject = result.get();
+                
+                // Copy the updated client info back to the original project object
+                project.setContactName(updatedProject.getContactName());
+                project.setContactEmail(updatedProject.getContactEmail());
+                project.setContactPhone(updatedProject.getContactPhone());
+                project.setContactCompany(updatedProject.getContactCompany());
+                project.setContactRole(updatedProject.getContactRole());
+                project.setContactAddress(updatedProject.getContactAddress());
+                project.setClientProjectId(updatedProject.getClientProjectId());
+                project.setClientProjectDescription(updatedProject.getClientProjectDescription());
+                project.setSendReports(updatedProject.isSendReports());
+                project.setReportFrequency(updatedProject.getReportFrequency());
+                project.setDescription(updatedProject.getDescription());
+                project.setStatus(updatedProject.getStatus());
+                project.setProjectManagerId(updatedProject.getProjectManagerId());
+                
+                // Copy travel field back to original project object (CRITICAL: was missing!)
+                project.setTravel(updatedProject.isTravel());
+                
+                // Update the project using the original project object with updated fields
+                projectRepository.update(project);
+                
+                // Refresh the timeline to show the updated information
+                refreshTimeline();
+                
+                // Show success message
+                Alert alert = com.subliminalsearch.simpleprojectresourcemanager.util.DialogUtils.createScreenAwareAlert(Alert.AlertType.INFORMATION, owner);
+                alert.setTitle("Success");
+                alert.setHeaderText("Project Updated");
+                alert.setContentText("Project and client information has been updated successfully.");
+                alert.showAndWait();
+            }
+            
+        } catch (Exception e) {
+            logger.error("Failed to edit project from timeline", e);
+            e.printStackTrace();
+            javafx.stage.Window errorOwner = getScene() != null ? getScene().getWindow() : null;
+            Alert alert = com.subliminalsearch.simpleprojectresourcemanager.util.DialogUtils.createScreenAwareAlert(Alert.AlertType.ERROR, errorOwner);
+            alert.setTitle("Error");
+            alert.setHeaderText("Failed to edit project");
+            alert.setContentText("Failed to update project: " + (e.getMessage() != null ? e.getMessage() : e.toString()));
             alert.showAndWait();
         }
     }

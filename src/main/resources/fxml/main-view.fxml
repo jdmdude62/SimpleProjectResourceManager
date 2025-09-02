@@ -14,6 +14,7 @@
                   <MenuItem fx:id="menuNewProject" text="Project..." />
                   <MenuItem fx:id="menuNewResource" text="Resource..." />
                   <MenuItem fx:id="menuNewAssignment" text="Assignment..." />
+                  <MenuItem fx:id="menuMultiAssignment" text="Multi-Resource Assignment..." />
                </Menu>
                <SeparatorMenuItem />
                <MenuItem fx:id="menuExit" text="Exit" onAction="#handleExit" />
@@ -25,6 +26,8 @@
                   <RadioMenuItem fx:id="menuDayView" text="Day View" />
                </Menu>
                <SeparatorMenuItem />
+               <CheckMenuItem fx:id="menuShowAllResources" text="Show All Resources" selected="false" />
+               <SeparatorMenuItem />
                <Menu text="Dashboards">
                   <MenuItem fx:id="menuExecutiveDashboard" text="Executive Dashboard" onAction="#openExecutiveDashboard" />
                   <MenuItem fx:id="menuResourceAvailabilityView" text="Resource Availability" />
@@ -33,10 +36,26 @@
                <SeparatorMenuItem />
                <MenuItem fx:id="menuRefresh" text="Refresh" />
             </Menu>
+            <Menu text="Resources">
+               <MenuItem fx:id="menuCertificationManagement" text="Manage Certifications..." />
+               <MenuItem fx:id="menuSkillsManagement" text="Manage Skills..." />
+               <MenuItem fx:id="menuSkillCategoryManagement" text="Manage Skill Categories..." />
+               <SeparatorMenuItem />
+               <MenuItem fx:id="menuResourceQualifications" text="Resource Qualifications..." />
+               <SeparatorMenuItem />
+               <MenuItem fx:id="menuResourceGrid" text="Resource Grid Editor..." />
+            </Menu>
             <Menu text="Projects">
+               <MenuItem fx:id="menuEditProject" text="Edit Project..." onAction="#openEditProjectDialog" />
+               <SeparatorMenuItem />
                <MenuItem fx:id="menuProjectGrid" text="Project Grid Editor..." />
                <MenuItem fx:id="menuProjectTasks" text="Project Tasks..." />
                <MenuItem fx:id="menuFinancialTracking" text="Financial Tracking..." onAction="#openFinancialTracking" />
+               <MenuItem fx:id="menuFinancialTimeline" text="Financial Timeline..." onAction="#openFinancialTimeline" />
+               <MenuItem fx:id="menuPOImport" text="Import Company POs..." onAction="#openPOImport" />
+               <SeparatorMenuItem />
+               <MenuItem fx:id="menuImportExcel" text="Import Tech Schedules from Excel..." />
+               <MenuItem fx:id="menuBatchDeleteProjects" text="Batch Delete Projects..." />
                <SeparatorMenuItem />
                <MenuItem fx:id="menuProjectManagers" text="Project Managers..." />
             </Menu>
@@ -52,12 +71,22 @@
             </Menu>
             <Menu text="Tools">
                <MenuItem fx:id="menuEmailSettings" text="Email Settings..." />
+               <MenuItem fx:id="menuUtilizationSettings" text="Utilization Settings..." onAction="#openUtilizationSettings" />
+               <SeparatorMenuItem />
+               <MenuItem fx:id="menuDomainLogins" text="Configure Domain Logins..." onAction="#configureDomainLogins" />
+               <MenuItem fx:id="menuSharePointSettings" text="SharePoint Integration..." onAction="#configureSharePoint" />
+               <SeparatorMenuItem />
+               <MenuItem fx:id="menuSyncNow" text="SharePoint Sync Now" onAction="#syncSharePointNow" />
+               <MenuItem fx:id="menuViewSyncLog" text="View SharePoint Sync Log" onAction="#viewSyncLog" />
             </Menu>
             <Menu text="Help">
                <MenuItem fx:id="menuUserGuide" text="User Guide" onAction="#openUserGuide" />
                <MenuItem fx:id="menuKeyboardShortcuts" text="Keyboard Shortcuts" onAction="#openKeyboardShortcuts" />
                <SeparatorMenuItem />
                <MenuItem fx:id="menuAbout" text="About" onAction="#openAbout" />
+            </Menu>
+            <Menu text="SYNC TEST">
+               <MenuItem text="Test SharePoint Sync NOW" onAction="#syncSharePointNow" />
             </Menu>
          </MenuBar>
          
@@ -103,10 +132,18 @@
             
             <!-- Action Buttons -->
             <Button fx:id="btnNewProject" text="+ Project" styleClass="btn-success" prefWidth="120" minWidth="120" prefHeight="36" minHeight="36" />
+            <Button fx:id="btnEditProject" text="Edit Project" styleClass="btn-warning" prefWidth="120" minWidth="120" prefHeight="36" minHeight="36" onAction="#openEditProjectDialog">
+               <tooltip><Tooltip text="Edit selected project" /></tooltip>
+            </Button>
             <Button fx:id="btnNewResource" text="+ Resource" styleClass="btn-info" prefWidth="130" minWidth="130" prefHeight="36" minHeight="36" />
             <Button fx:id="btnNewAssignment" text="+ Assignment" styleClass="btn-primary" prefWidth="140" minWidth="140" prefHeight="36" minHeight="36" />
+            <Button fx:id="btnAutoAssignShop" text="Auto-Assign SHOP" styleClass="btn-warning" prefWidth="150" minWidth="150" prefHeight="36" minHeight="36">
+               <tooltip><Tooltip text="Automatically assign resources to SHOP for unscheduled weekdays" /></tooltip>
+            </Button>
             <Separator orientation="VERTICAL" />
             <Button fx:id="btnExecutiveView" text="Executive Review" styleClass="btn-executive" prefWidth="200" prefHeight="32" onAction="#handleExecutiveView" />
+            <Separator orientation="VERTICAL" />
+            <Button fx:id="btnSharePointSync" text="SharePoint Sync" styleClass="btn-sync" prefWidth="150" prefHeight="32" />
          </ToolBar>
       </VBox>
    </top>
@@ -141,6 +178,16 @@
          </VBox>
          
          <Button fx:id="btnClearFilters" text="Clear Filters" prefWidth="180.0" />
+         
+         <Separator />
+         
+         <VBox spacing="5.0">
+            <Label text="Display Options:" styleClass="h6" />
+            <CheckBox fx:id="showUnavailabilityCheckBox" text="Show Unavailability" selected="true" />
+            <Label text="When enabled:" styleClass="text-muted" wrapText="true" prefWidth="170.0" style="-fx-font-size: 10;" />
+            <Label text="• Shop/Training hidden during PTO" styleClass="text-muted" wrapText="true" prefWidth="170.0" style="-fx-font-size: 10;" />
+            <Label text="• Project conflicts highlighted" styleClass="text-muted" wrapText="true" prefWidth="170.0" style="-fx-font-size: 10;" />
+         </VBox>
       </VBox>
    </left>
    

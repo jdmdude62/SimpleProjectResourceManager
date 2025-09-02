@@ -3,6 +3,7 @@ package com.subliminalsearch.simpleprojectresourcemanager.view;
 import com.subliminalsearch.simpleprojectresourcemanager.model.*;
 import com.subliminalsearch.simpleprojectresourcemanager.repository.*;
 import com.subliminalsearch.simpleprojectresourcemanager.service.SchedulingService;
+import com.subliminalsearch.simpleprojectresourcemanager.util.HelpButton;
 import javafx.animation.Animation;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
@@ -19,6 +20,7 @@ import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.scene.text.Text;
 import javafx.stage.Stage;
+import javafx.stage.Window;
 import javafx.util.Duration;
 
 import java.time.LocalDate;
@@ -56,12 +58,20 @@ public class ExecutiveCommandCenter {
     private List<Project> projectsAtRisk = new ArrayList<>();
     
     public ExecutiveCommandCenter(SchedulingService schedulingService) {
+        this(schedulingService, null);
+    }
+    
+    public ExecutiveCommandCenter(SchedulingService schedulingService, Window owner) {
         this.schedulingService = schedulingService;
         this.projectRepository = schedulingService.getProjectRepository();
         this.resourceRepository = schedulingService.getResourceRepository();
         this.assignmentRepository = schedulingService.getAssignmentRepository();
         this.taskRepository = new TaskRepository(schedulingService.getDataSource());
         this.stage = new Stage();
+        
+        if (owner != null) {
+            stage.initOwner(owner);
+        }
         
         initialize();
         loadMetrics();
@@ -164,7 +174,39 @@ public class ExecutiveCommandCenter {
         Button alertsBtn = new Button("🔔 Configure Alerts");
         alertsBtn.setStyle("-fx-background-color: white; -fx-text-fill: #2c3e50; -fx-font-weight: bold;");
         
-        header.getChildren().addAll(title, spacer, timeLabel, exportBtn, alertsBtn);
+        // Create help button with white styling to match other buttons
+        Button helpButton = HelpButton.create(
+            "Executive Dashboard Help",
+            "**Executive Review Dashboard**\n\n" +
+            "**Morning Coffee Dashboard:**\n" +
+            "• Quick overview of critical metrics\n" +
+            "• Active projects and resource status\n" +
+            "• Immediate action items\n" +
+            "• Resource conflicts requiring attention\n\n" +
+            "**Executive Scorecard:**\n" +
+            "• KPI tracking and trends\n" +
+            "• Budget and financial overview\n" +
+            "• Resource utilization metrics\n" +
+            "• Project health indicators\n\n" +
+            "**Decision Queue:**\n" +
+            "• Items requiring executive approval\n" +
+            "• Resource allocation decisions\n" +
+            "• Project priority conflicts\n" +
+            "• Budget overrun approvals\n\n" +
+            "**Alerts Panel:**\n" +
+            "• Real-time notifications\n" +
+            "• Critical project updates\n" +
+            "• Resource availability changes\n" +
+            "• Schedule conflicts\n\n" +
+            "**Key Metrics:**\n" +
+            "• **Green:** On track, no issues\n" +
+            "• **Yellow:** Needs monitoring\n" +
+            "• **Red:** Requires immediate attention\n\n" +
+            "**Auto-refresh:** Dashboard updates every 30 seconds"
+        );
+        helpButton.setStyle("-fx-background-color: white; -fx-text-fill: #2c3e50; -fx-font-weight: bold;");
+        
+        header.getChildren().addAll(title, spacer, timeLabel, exportBtn, alertsBtn, helpButton);
         return header;
     }
     
@@ -886,8 +928,16 @@ public class ExecutiveCommandCenter {
     }
     
     public void show() {
+        // Position relative to owner if available
+        if (stage.getOwner() != null) {
+            Window owner = stage.getOwner();
+            stage.setX(owner.getX() + (owner.getWidth() - stage.getWidth()) / 2);
+            stage.setY(owner.getY() + (owner.getHeight() - stage.getHeight()) / 2);
+        } else {
+            stage.centerOnScreen();
+        }
+        
         stage.show();
-        stage.centerOnScreen();
         
         // Perform initial data refresh when dashboard opens
         refreshAllData();

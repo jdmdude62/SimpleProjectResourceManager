@@ -2,8 +2,13 @@ package com.subliminalsearch.simpleprojectresourcemanager.view;
 
 import com.subliminalsearch.simpleprojectresourcemanager.model.Project;
 import com.subliminalsearch.simpleprojectresourcemanager.model.Task;
+import com.subliminalsearch.simpleprojectresourcemanager.model.TaskDependency;
+import com.subliminalsearch.simpleprojectresourcemanager.model.TaskDependency.DependencyType;
 import com.subliminalsearch.simpleprojectresourcemanager.model.Resource;
 import com.subliminalsearch.simpleprojectresourcemanager.repository.TaskRepository;
+import com.subliminalsearch.simpleprojectresourcemanager.repository.TaskDependencyRepository;
+import com.subliminalsearch.simpleprojectresourcemanager.util.DialogUtils;
+import com.subliminalsearch.simpleprojectresourcemanager.util.HelpButton;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.collections.FXCollections;
@@ -12,6 +17,7 @@ import javafx.geometry.Bounds;
 import javafx.geometry.Insets;
 import javafx.geometry.Point2D;
 import javafx.geometry.Pos;
+import javafx.scene.Group;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
@@ -22,6 +28,7 @@ import javafx.scene.input.MouseEvent;
 import javafx.scene.input.ScrollEvent;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
+import javafx.scene.shape.Circle;
 import javafx.scene.shape.Line;
 import javafx.scene.shape.Polygon;
 import javafx.scene.shape.Rectangle;
@@ -31,6 +38,7 @@ import javafx.scene.text.Text;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.util.Duration;
+import javafx.util.StringConverter;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -44,6 +52,7 @@ import java.util.stream.Collectors;
 public class GanttChartView {
     private final Project project;
     private final TaskRepository taskRepository;
+    private final TaskDependencyRepository dependencyRepository;
     private final List<Resource> resources;
     private final Stage stage;
     
@@ -62,7 +71,8 @@ public class GanttChartView {
     // Data
     private ObservableList<Task> tasks;
     private Map<Long, TaskBar> taskBars = new HashMap<>();
-    private Map<Long, List<Long>> dependencies = new HashMap<>(); // Task ID -> List of dependent task IDs
+    private Map<Long, List<TaskDependency>> taskDependencies = new HashMap<>(); // Task ID -> List of dependencies
+    private List<TaskDependency> dependencies = new ArrayList<>();
     private Set<Long> criticalPath = new HashSet<>();
     
     // View settings
@@ -73,12 +83,13 @@ public class GanttChartView {
     private double headerHeight = 60; // height of timeline header
     private int zoomLevel = 0; // 0=Day, 1=Week, 2=Month (default to Day view)
     
-    // Colors
-    private static final Color COLOR_TASK_NORMAL = Color.web("#4A90E2");
-    private static final Color COLOR_TASK_CRITICAL = Color.web("#E74C3C");
-    private static final Color COLOR_TASK_COMPLETE = Color.web("#27AE60");
+    // Colors - Improved scheme for better contrast and visibility
+    private static final Color COLOR_TASK_NORMAL = Color.web("#0066CC");  // Darker blue
+    private static final Color COLOR_TASK_CRITICAL = Color.web("#DC3545");
+    private static final Color COLOR_TASK_COMPLETE = Color.web("#28A745");
+    private static final Color COLOR_TASK_PROGRESS = Color.web("#FFC107");  // Amber for progress
     private static final Color COLOR_MILESTONE = Color.web("#F39C12");
-    private static final Color COLOR_DEPENDENCY = Color.web("#7F8C8D");
+    private static final Color COLOR_DEPENDENCY = Color.web("#6C757D");
     private static final Color COLOR_TODAY = Color.web("#E67E22");
     private static final Color COLOR_WEEKEND = Color.web("#ECF0F1");
     private static final Color COLOR_GRID = Color.web("#BDC3C7");
@@ -90,18 +101,31 @@ public class GanttChartView {
     private double dragStartX = 0;
     
     public GanttChartView(Project project, TaskRepository taskRepository, List<Resource> resources) {
+        this(project, taskRepository, null, resources, null);
+    }
+    
+    public GanttChartView(Project project, TaskRepository taskRepository, TaskDependencyRepository dependencyRepository, List<Resource> resources) {
+        this(project, taskRepository, dependencyRepository, resources, null);
+    }
+    
+    public GanttChartView(Project project, TaskRepository taskRepository, TaskDependencyRepository dependencyRepository, List<Resource> resources, javafx.stage.Window owner) {
         this.project = project;
         this.taskRepository = taskRepository;
+        this.dependencyRepository = dependencyRepository;
         this.resources = resources;
         this.stage = new Stage();
         this.stage.initModality(Modality.APPLICATION_MODAL);
         this.stage.setTitle("Gantt Chart - " + project.getProjectId());
         
-        initialize();
+        if (owner != null) {
+            this.stage.initOwner(owner);
+        }
+        
+        initialize(owner);
         loadTasks();
     }
     
-    private void initialize() {
+    private void initialize(javafx.stage.Window owner) {
         BorderPane root = new BorderPane();
         root.setPrefSize(1200, 700);
         
@@ -161,6 +185,15 @@ public class GanttChartView {
         scene.getStylesheets().add(getClass().getResource("/css/gantt-chart.css").toExternalForm());
         stage.setScene(scene);
         
+        // Position on the same screen as owner
+        if (owner != null) {
+            DialogUtils.positionStageOnOwnerScreen(stage, owner, 0.9, 0.85);
+        } else {
+            stage.setWidth(1400);
+            stage.setHeight(800);
+            stage.centerOnScreen();
+        }
+        
         mainScrollPane = ganttScrollPane;
         
         // Setup keyboard shortcuts
@@ -215,8 +248,41 @@ public class GanttChartView {
         Button refreshButton = new Button("Refresh");
         refreshButton.setOnAction(e -> loadTasks());
         
+        // Add Dependency button
+        Button addDependencyButton = new Button("Add Dependency");
+        addDependencyButton.setOnAction(e -> showCreateDependencyDialog());
+        addDependencyButton.setDisable(dependencyRepository == null);
+        
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
+        
+        // Create help button
+        Button helpButton = HelpButton.create(
+            "Gantt Chart Help",
+            "**Gantt Chart View**\n\n" +
+            "**Controls:**\n" +
+            "• **Zoom:** Change time scale (Day/Week/Month/Quarter)\n" +
+            "• **Dependencies:** Show/hide task dependencies\n" +
+            "• **Critical Path:** Highlight critical path tasks\n" +
+            "• **Progress:** Show/hide task completion status\n\n" +
+            "**Interactions:**\n" +
+            "• **Drag tasks** to reschedule\n" +
+            "• **Resize task bars** to change duration\n" +
+            "• **Click tasks** to view details\n" +
+            "• **Scroll** to navigate timeline\n" +
+            "• **Double-click** to edit task\n\n" +
+            "**Task Dependencies:**\n" +
+            "• **FS:** Finish-to-Start (default)\n" +
+            "• **FF:** Finish-to-Finish\n" +
+            "• **SS:** Start-to-Start\n" +
+            "• **SF:** Start-to-Finish\n\n" +
+            "**Colors:**\n" +
+            "• **Blue:** Normal tasks\n" +
+            "• **Red:** Critical path tasks\n" +
+            "• **Green:** Completed tasks\n" +
+            "• **Orange:** Milestones\n" +
+            "• **Gray:** Dependencies"
+        );
         
         toolbar.getChildren().addAll(
             zoomLabel, zoomComboBox,
@@ -225,11 +291,14 @@ public class GanttChartView {
             showCriticalPathCheckBox,
             showProgressCheckBox,
             new Separator(),
+            addDependencyButton,
             todayButton,
             fitButton,
             new Separator(),
             exportButton,
-            refreshButton
+            refreshButton,
+            spacer,
+            helpButton
         );
         
         return toolbar;
@@ -286,6 +355,11 @@ public class GanttChartView {
     private void loadTasks() {
         tasks = FXCollections.observableArrayList(taskRepository.findByProjectId(project.getId()));
         
+        // Load dependencies if repository is available
+        if (dependencyRepository != null) {
+            dependencies = dependencyRepository.findByProjectId(project.getId());
+        }
+        
         // Sort tasks by start date, then by ID for consistent ordering
         tasks.sort((a, b) -> {
             LocalDate aStart = a.getPlannedStart() != null ? a.getPlannedStart() : LocalDate.now();
@@ -335,17 +409,23 @@ public class GanttChartView {
     }
     
     private void loadDependencies() {
-        dependencies.clear();
+        taskDependencies.clear();
         
-        // Load dependencies from task relationships
-        for (Task task : tasks) {
-            if (task.getParentTaskId() != null) {
-                // Parent-child dependency
-                dependencies.computeIfAbsent(task.getParentTaskId(), k -> new ArrayList<>()).add(task.getId());
+        // Load from dependency repository if available
+        if (dependencyRepository != null) {
+            List<TaskDependency> allDeps = dependencyRepository.findByProjectId(project.getId());
+            for (TaskDependency dep : allDeps) {
+                taskDependencies.computeIfAbsent(dep.getPredecessorId(), k -> new ArrayList<>()).add(dep);
             }
-            
-            // Could also load from a separate dependencies table if available
-            // This is where you'd load finish-to-start, start-to-start relationships etc.
+        } else {
+            // Fallback: Load from parent-child relationships
+            for (Task task : tasks) {
+                if (task.getParentTaskId() != null) {
+                    // Create a default finish-to-start dependency
+                    TaskDependency dep = new TaskDependency(task.getParentTaskId(), task.getId());
+                    taskDependencies.computeIfAbsent(task.getParentTaskId(), k -> new ArrayList<>()).add(dep);
+                }
+            }
         }
     }
     
@@ -774,15 +854,7 @@ public class GanttChartView {
             Node taskBarNode = createTaskBar(task, row);
             ganttCanvas.getChildren().add(taskBarNode);
             
-            // Get the actual TaskBar from our map for progress bar calculation
-            TaskBar taskBar = taskBars.get(task.getId());
-            
-            // Add progress bar if enabled and task has progress
-            if (showProgressCheckBox.isSelected() && task.getProgressPercentage() != null && 
-                task.getProgressPercentage() > 0 && taskBar != null) {
-                Node progressBar = createProgressBar(task, taskBar);
-                ganttCanvas.getChildren().add(progressBar);
-            }
+            // Progress bar is now integrated into the task bar group, so we don't need to add it separately
         } else if (task.getPlannedStart() != null) {
             // Milestone (single date)
             Node milestone = createMilestone(task, row);
@@ -801,8 +873,8 @@ public class GanttChartView {
         double width = duration * dayWidth;
         double y = row * taskHeight + 10;
         
-        // Create a group to hold the task bar and its text
-        StackPane taskGroup = new StackPane();
+        // Create a group to hold the task bar and its components
+        Group taskGroup = new Group();
         taskGroup.setLayoutX(x);
         taskGroup.setLayoutY(y);
         
@@ -817,35 +889,72 @@ public class GanttChartView {
             taskBar.setFill(COLOR_TASK_NORMAL);
         }
         
-        // Add task title text on the bar
-        Text taskText = new Text(task.getTitle());
-        taskText.setFill(Color.WHITE);
-        taskText.setFont(Font.font("System", FontWeight.NORMAL, 11));
-        taskText.setStroke(Color.BLACK);
-        taskText.setStrokeWidth(0.5);
-        taskText.setMouseTransparent(true);  // Make text not block mouse events
+        // Add the task bar as the base layer
+        taskGroup.getChildren().add(taskBar);
         
-        // Add both to the group
-        taskGroup.getChildren().addAll(taskBar, taskText);
-        taskGroup.setAlignment(Pos.CENTER_LEFT);
-        taskGroup.setPrefWidth(width);
+        // Add progress bar if enabled and task has progress
+        if (showProgressCheckBox.isSelected() && task.getProgressPercentage() != null && 
+            task.getProgressPercentage() > 0) {
+            double progressWidth = width * (task.getProgressPercentage() / 100.0);
+            double progressHeight = (taskHeight - 20) * 0.4; // 40% of task bar height
+            Rectangle progressBar = new Rectangle(progressWidth, progressHeight);
+            progressBar.setFill(COLOR_TASK_PROGRESS);  // Use amber color
+            progressBar.setOpacity(0.8);
+            progressBar.setLayoutY((taskHeight - 20 - progressHeight) / 2); // Center vertically
+            taskGroup.getChildren().add(progressBar);
+        }
         
-        // Ensure text is clipped to bar width
+        // Add resource badge on the right side of the task bar
+        if (task.getAssignedToName() != null && !task.getAssignedToName().isEmpty()) {
+            Node resourceBadge = createResourceBadge(task.getAssignedToName());
+            // Position badge on the right side with padding
+            resourceBadge.setLayoutX(width - 22); // Right side (16 is badge width + padding)
+            resourceBadge.setLayoutY((taskHeight - 20 - 16) / 2); // Center vertically (16 is badge height)
+            taskGroup.getChildren().add(resourceBadge);
+        }
+        
+        // Add progress percentage text with better visibility
+        if (showProgressCheckBox.isSelected() && task.getProgressPercentage() != null && 
+            task.getProgressPercentage() > 0) {
+            // Create background for text visibility at the start of the bar
+            Rectangle textBg = new Rectangle(30, 14);
+            textBg.setFill(Color.BLACK);
+            textBg.setOpacity(0.7);
+            textBg.setLayoutX(0);  // Start at the left edge of the task bar
+            textBg.setLayoutY(3);
+            textBg.setArcWidth(4);
+            textBg.setArcHeight(4);
+            taskGroup.getChildren().add(textBg);
+            
+            Text progressText = new Text(task.getProgressPercentage() + "%");
+            progressText.setFill(Color.WHITE);
+            progressText.setFont(Font.font("System", FontWeight.BOLD, 10));
+            progressText.setLayoutX(3); // Small padding from left edge
+            progressText.setLayoutY(12); // Fixed vertical position near top
+            taskGroup.getChildren().add(progressText);
+        }
+        
+        // Ensure content is clipped to bar width
         Rectangle clip = new Rectangle(width, taskHeight - 20);
         taskGroup.setClip(clip);
         
-        // Add tooltip
+        // Add enhanced tooltip with resource info
         int progress = task.getProgressPercentage() != null ? task.getProgressPercentage() : 0;
-        Tooltip tooltip = new Tooltip(String.format("%s\n%s to %s\nProgress: %d%%\nStatus: %s",
+        String assignedTo = task.getAssignedToName() != null ? task.getAssignedToName() : "Unassigned";
+        Tooltip tooltip = new Tooltip(String.format("%s\n%s to %s\nAssigned to: %s\nProgress: %d%%\nStatus: %s",
             task.getTitle(),
             startDate.format(DateTimeFormatter.ofPattern("MMM d, yyyy")),
             endDate.format(DateTimeFormatter.ofPattern("MMM d, yyyy")),
+            assignedTo,
             progress,
             task.getStatus() != null ? task.getStatus() : "Not Set"));
         Tooltip.install(taskGroup, tooltip);
         
         // Store the actual TaskBar for reference
         taskBars.put(task.getId(), taskBar);
+        
+        // Add context menu for dependency management
+        setupDependencyContextMenu(taskBar, task);
         
         return taskGroup;
     }
@@ -915,28 +1024,61 @@ public class GanttChartView {
     }
     
     private void drawDependencies() {
-        for (Map.Entry<Long, List<Long>> entry : dependencies.entrySet()) {
+        for (Map.Entry<Long, List<TaskDependency>> entry : taskDependencies.entrySet()) {
             TaskBar fromBar = taskBars.get(entry.getKey());
             if (fromBar != null) {
-                for (Long toId : entry.getValue()) {
-                    TaskBar toBar = taskBars.get(toId);
+                for (TaskDependency dep : entry.getValue()) {
+                    TaskBar toBar = taskBars.get(dep.getSuccessorId());
                     if (toBar != null) {
-                        drawDependencyLine(fromBar, toBar);
+                        drawDependencyLine(fromBar, toBar, dep.getDependencyType());
                     }
                 }
             }
         }
     }
     
-    private void drawDependencyLine(TaskBar from, TaskBar to) {
+    private void drawDependencyLine(TaskBar from, TaskBar to, DependencyType type) {
         // Get positions from parent nodes if they exist
         Node fromParent = from.getParent();
         Node toParent = to.getParent();
         
-        double startX = (fromParent != null ? fromParent.getLayoutX() : from.getLayoutX()) + from.getWidth();
-        double startY = (fromParent != null ? fromParent.getLayoutY() : from.getLayoutY()) + from.getHeight() / 2;
-        double endX = toParent != null ? toParent.getLayoutX() : to.getLayoutX();
-        double endY = (toParent != null ? toParent.getLayoutY() : to.getLayoutY()) + to.getHeight() / 2;
+        double startX, startY, endX, endY;
+        
+        // Adjust connection points based on dependency type
+        switch (type) {
+            case FINISH_TO_START:
+            default:
+                // Connect from end of predecessor to start of successor
+                startX = (fromParent != null ? fromParent.getLayoutX() : from.getLayoutX()) + from.getWidth();
+                startY = (fromParent != null ? fromParent.getLayoutY() : from.getLayoutY()) + from.getHeight() / 2;
+                endX = toParent != null ? toParent.getLayoutX() : to.getLayoutX();
+                endY = (toParent != null ? toParent.getLayoutY() : to.getLayoutY()) + to.getHeight() / 2;
+                break;
+                
+            case START_TO_START:
+                // Connect from start of predecessor to start of successor
+                startX = fromParent != null ? fromParent.getLayoutX() : from.getLayoutX();
+                startY = (fromParent != null ? fromParent.getLayoutY() : from.getLayoutY()) + from.getHeight() / 2;
+                endX = toParent != null ? toParent.getLayoutX() : to.getLayoutX();
+                endY = (toParent != null ? toParent.getLayoutY() : to.getLayoutY()) + to.getHeight() / 2;
+                break;
+                
+            case FINISH_TO_FINISH:
+                // Connect from end of predecessor to end of successor
+                startX = (fromParent != null ? fromParent.getLayoutX() : from.getLayoutX()) + from.getWidth();
+                startY = (fromParent != null ? fromParent.getLayoutY() : from.getLayoutY()) + from.getHeight() / 2;
+                endX = (toParent != null ? toParent.getLayoutX() : to.getLayoutX()) + to.getWidth();
+                endY = (toParent != null ? toParent.getLayoutY() : to.getLayoutY()) + to.getHeight() / 2;
+                break;
+                
+            case START_TO_FINISH:
+                // Connect from start of predecessor to end of successor
+                startX = fromParent != null ? fromParent.getLayoutX() : from.getLayoutX();
+                startY = (fromParent != null ? fromParent.getLayoutY() : from.getLayoutY()) + from.getHeight() / 2;
+                endX = (toParent != null ? toParent.getLayoutX() : to.getLayoutX()) + to.getWidth();
+                endY = (toParent != null ? toParent.getLayoutY() : to.getLayoutY()) + to.getHeight() / 2;
+                break;
+        }
         
         // Create path with arrow
         Line line = new Line(startX, startY, endX, endY);
@@ -971,10 +1113,10 @@ public class GanttChartView {
         for (Task task : tasks) {
             if (task.getPlannedStart() != null && task.getPlannedEnd() != null) {
                 // Check if task has dependencies
-                boolean hasDependents = dependencies.containsKey(task.getId()) && 
-                                       !dependencies.get(task.getId()).isEmpty();
-                boolean isDependency = dependencies.values().stream()
-                    .anyMatch(list -> list.contains(task.getId()));
+                boolean hasDependents = dependencies.stream()
+                    .anyMatch(dep -> dep.getPredecessorId().equals(task.getId()));
+                boolean isDependency = dependencies.stream()
+                    .anyMatch(dep -> dep.getSuccessorId().equals(task.getId()));
                 
                 if (hasDependents || isDependency) {
                     criticalPath.add(task.getId());
@@ -1265,6 +1407,361 @@ public class GanttChartView {
         });
     }
     
+    private void setupDependencyContextMenu(TaskBar taskBar, Task task) {
+        ContextMenu contextMenu = new ContextMenu();
+        
+        MenuItem createDependency = new MenuItem("Create Dependency From This Task...");
+        createDependency.setOnAction(e -> showCreateDependencyDialog(task, true));
+        
+        MenuItem createPredecessor = new MenuItem("Add Predecessor...");
+        createPredecessor.setOnAction(e -> showCreateDependencyDialog(task, false));
+        
+        MenuItem viewDependencies = new MenuItem("View Dependencies");
+        viewDependencies.setOnAction(e -> showDependenciesDialog(task));
+        
+        MenuItem removeDependencies = new MenuItem("Remove All Dependencies");
+        removeDependencies.setOnAction(e -> removeTaskDependencies(task));
+        
+        contextMenu.getItems().addAll(
+            createDependency,
+            createPredecessor,
+            new SeparatorMenuItem(),
+            viewDependencies,
+            removeDependencies
+        );
+        
+        taskBar.setOnContextMenuRequested(e -> {
+            contextMenu.show(taskBar, e.getScreenX(), e.getScreenY());
+            e.consume();
+        });
+    }
+    
+    private void showCreateDependencyDialog() {
+        if (dependencyRepository == null) {
+            Alert alert = new Alert(Alert.AlertType.WARNING);
+            alert.setTitle("Dependencies Not Available");
+            alert.setHeaderText(null);
+            alert.setContentText("Task dependency repository is not initialized.");
+            alert.showAndWait();
+            return;
+        }
+        
+        if (tasks == null || tasks.size() < 2) {
+            Alert alert = new Alert(Alert.AlertType.WARNING);
+            alert.setTitle("Insufficient Tasks");
+            alert.setHeaderText(null);
+            alert.setContentText("You need at least 2 tasks to create a dependency.");
+            alert.showAndWait();
+            return;
+        }
+        
+        Dialog<TaskDependency> dialog = new Dialog<>();
+        dialog.setTitle("Create Task Dependency");
+        dialog.setHeaderText("Select predecessor and successor tasks");
+        
+        GridPane grid = new GridPane();
+        grid.setHgap(10);
+        grid.setVgap(10);
+        grid.setPadding(new Insets(20));
+        
+        ComboBox<Task> predecessorCombo = new ComboBox<>();
+        predecessorCombo.setItems(tasks);
+        predecessorCombo.setConverter(new StringConverter<Task>() {
+            @Override
+            public String toString(Task task) {
+                return task != null ? task.getTitle() : "";
+            }
+            
+            @Override
+            public Task fromString(String string) {
+                return null;
+            }
+        });
+        predecessorCombo.setPrefWidth(300);
+        
+        ComboBox<Task> successorCombo = new ComboBox<>();
+        successorCombo.setItems(tasks);
+        successorCombo.setConverter(new StringConverter<Task>() {
+            @Override
+            public String toString(Task task) {
+                return task != null ? task.getTitle() : "";
+            }
+            
+            @Override
+            public Task fromString(String string) {
+                return null;
+            }
+        });
+        successorCombo.setPrefWidth(300);
+        
+        ComboBox<DependencyType> typeCombo = new ComboBox<>();
+        typeCombo.setItems(FXCollections.observableArrayList(DependencyType.values()));
+        typeCombo.setValue(DependencyType.FINISH_TO_START);
+        typeCombo.setConverter(new StringConverter<DependencyType>() {
+            @Override
+            public String toString(DependencyType type) {
+                return type != null ? type.getDisplayName() : "";
+            }
+            
+            @Override
+            public DependencyType fromString(String string) {
+                return null;
+            }
+        });
+        
+        Spinner<Integer> lagSpinner = new Spinner<>(-30, 30, 0);
+        lagSpinner.setEditable(true);
+        
+        grid.add(new Label("Predecessor Task:"), 0, 0);
+        grid.add(predecessorCombo, 1, 0);
+        grid.add(new Label("Successor Task:"), 0, 1);
+        grid.add(successorCombo, 1, 1);
+        grid.add(new Label("Dependency Type:"), 0, 2);
+        grid.add(typeCombo, 1, 2);
+        grid.add(new Label("Lag Days:"), 0, 3);
+        grid.add(lagSpinner, 1, 3);
+        
+        dialog.getDialogPane().setContent(grid);
+        
+        ButtonType createButton = new ButtonType("Create", ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().addAll(createButton, ButtonType.CANCEL);
+        
+        dialog.setResultConverter(dialogButton -> {
+            if (dialogButton == createButton && 
+                predecessorCombo.getValue() != null && 
+                successorCombo.getValue() != null) {
+                
+                Task predecessor = predecessorCombo.getValue();
+                Task successor = successorCombo.getValue();
+                
+                if (predecessor.getId().equals(successor.getId())) {
+                    Alert alert = new Alert(Alert.AlertType.ERROR);
+                    alert.setTitle("Invalid Dependency");
+                    alert.setHeaderText(null);
+                    alert.setContentText("A task cannot depend on itself.");
+                    alert.showAndWait();
+                    return null;
+                }
+                
+                return new TaskDependency(
+                    predecessor.getId(),
+                    successor.getId(),
+                    typeCombo.getValue(),
+                    lagSpinner.getValue()
+                );
+            }
+            return null;
+        });
+        
+        dialog.showAndWait().ifPresent(dependency -> {
+            try {
+                // Check for cyclic dependencies
+                if (dependencyRepository.hasCyclicDependency(
+                        dependency.getPredecessorId(), 
+                        dependency.getSuccessorId())) {
+                    Alert alert = new Alert(Alert.AlertType.ERROR);
+                    alert.setTitle("Invalid Dependency");
+                    alert.setHeaderText("Cannot create dependency");
+                    alert.setContentText("This would create a circular dependency.");
+                    alert.showAndWait();
+                    return;
+                }
+                
+                // Save the dependency
+                dependencyRepository.save(dependency);
+                
+                // Refresh the view
+                loadTasks();
+                refreshDisplay();
+                
+                Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                alert.setTitle("Success");
+                alert.setHeaderText(null);
+                alert.setContentText("Dependency created successfully!");
+                alert.showAndWait();
+            } catch (Exception e) {
+                e.printStackTrace();
+                Alert alert = new Alert(Alert.AlertType.ERROR);
+                alert.setTitle("Error");
+                alert.setHeaderText("Failed to create dependency");
+                alert.setContentText(e.getMessage());
+                alert.showAndWait();
+            }
+        });
+    }
+    
+    private void showCreateDependencyDialog(Task fromTask, boolean isFromPredecessor) {
+        if (dependencyRepository == null) {
+            // Initialize repository if not provided
+            return;
+        }
+        
+        Dialog<TaskDependency> dialog = new Dialog<>();
+        dialog.setTitle("Create Task Dependency");
+        dialog.setHeaderText(isFromPredecessor ? 
+            "Select task that depends on: " + fromTask.getTitle() :
+            "Select predecessor for: " + fromTask.getTitle());
+        
+        GridPane grid = new GridPane();
+        grid.setHgap(10);
+        grid.setVgap(10);
+        grid.setPadding(new Insets(20));
+        
+        ComboBox<Task> taskCombo = new ComboBox<>();
+        taskCombo.setItems(FXCollections.observableArrayList(
+            tasks.stream()
+                .filter(t -> !t.getId().equals(fromTask.getId()))
+                .collect(Collectors.toList())
+        ));
+        taskCombo.setConverter(new StringConverter<Task>() {
+            @Override
+            public String toString(Task task) {
+                return task != null ? task.getTitle() : "";
+            }
+            
+            @Override
+            public Task fromString(String string) {
+                return null;
+            }
+        });
+        taskCombo.setPrefWidth(300);
+        
+        ComboBox<DependencyType> typeCombo = new ComboBox<>();
+        typeCombo.setItems(FXCollections.observableArrayList(DependencyType.values()));
+        typeCombo.setValue(DependencyType.FINISH_TO_START);
+        typeCombo.setConverter(new StringConverter<DependencyType>() {
+            @Override
+            public String toString(DependencyType type) {
+                return type != null ? type.getDisplayName() : "";
+            }
+            
+            @Override
+            public DependencyType fromString(String string) {
+                return null;
+            }
+        });
+        
+        Spinner<Integer> lagSpinner = new Spinner<>(-30, 30, 0);
+        lagSpinner.setEditable(true);
+        
+        grid.add(new Label(isFromPredecessor ? "Successor Task:" : "Predecessor Task:"), 0, 0);
+        grid.add(taskCombo, 1, 0);
+        grid.add(new Label("Dependency Type:"), 0, 1);
+        grid.add(typeCombo, 1, 1);
+        grid.add(new Label("Lag Days:"), 0, 2);
+        grid.add(lagSpinner, 1, 2);
+        
+        dialog.getDialogPane().setContent(grid);
+        
+        ButtonType createButton = new ButtonType("Create", ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().addAll(createButton, ButtonType.CANCEL);
+        
+        dialog.setResultConverter(dialogButton -> {
+            if (dialogButton == createButton && taskCombo.getValue() != null) {
+                Task otherTask = taskCombo.getValue();
+                
+                if (isFromPredecessor) {
+                    return new TaskDependency(
+                        fromTask.getId(),
+                        otherTask.getId(),
+                        typeCombo.getValue(),
+                        lagSpinner.getValue()
+                    );
+                } else {
+                    return new TaskDependency(
+                        otherTask.getId(),
+                        fromTask.getId(),
+                        typeCombo.getValue(),
+                        lagSpinner.getValue()
+                    );
+                }
+            }
+            return null;
+        });
+        
+        dialog.showAndWait().ifPresent(dependency -> {
+            try {
+                // Check for cyclic dependencies
+                if (dependencyRepository.hasCyclicDependency(
+                        dependency.getPredecessorId(), 
+                        dependency.getSuccessorId())) {
+                    Alert alert = new Alert(Alert.AlertType.ERROR);
+                    alert.setTitle("Invalid Dependency");
+                    alert.setHeaderText("Cannot create dependency");
+                    alert.setContentText("This would create a circular dependency.");
+                    alert.showAndWait();
+                    return;
+                }
+                
+                dependencyRepository.save(dependency);
+                loadDependencies();
+                refreshDisplay();
+            } catch (Exception e) {
+                Alert alert = new Alert(Alert.AlertType.ERROR);
+                alert.setTitle("Error");
+                alert.setHeaderText("Failed to create dependency");
+                alert.setContentText(e.getMessage());
+                alert.showAndWait();
+            }
+        });
+    }
+    
+    private void showDependenciesDialog(Task task) {
+        if (dependencyRepository == null) return;
+        
+        Dialog<Void> dialog = new Dialog<>();
+        dialog.setTitle("Task Dependencies");
+        dialog.setHeaderText("Dependencies for: " + task.getTitle());
+        
+        VBox content = new VBox(10);
+        content.setPadding(new Insets(20));
+        
+        Label predecessorsLabel = new Label("Predecessors:");
+        predecessorsLabel.setFont(Font.font(null, FontWeight.BOLD, 12));
+        
+        ListView<TaskDependency> predecessorsList = new ListView<>();
+        predecessorsList.setItems(FXCollections.observableArrayList(
+            dependencyRepository.findPredecessors(task.getId())
+        ));
+        predecessorsList.setPrefHeight(100);
+        
+        Label successorsLabel = new Label("Successors:");
+        successorsLabel.setFont(Font.font(null, FontWeight.BOLD, 12));
+        
+        ListView<TaskDependency> successorsList = new ListView<>();
+        successorsList.setItems(FXCollections.observableArrayList(
+            dependencyRepository.findSuccessors(task.getId())
+        ));
+        successorsList.setPrefHeight(100);
+        
+        content.getChildren().addAll(
+            predecessorsLabel, predecessorsList,
+            new Separator(),
+            successorsLabel, successorsList
+        );
+        
+        dialog.getDialogPane().setContent(content);
+        dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
+        dialog.showAndWait();
+    }
+    
+    private void removeTaskDependencies(Task task) {
+        if (dependencyRepository == null) return;
+        
+        Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
+        confirm.setTitle("Remove Dependencies");
+        confirm.setHeaderText("Remove all dependencies for: " + task.getTitle());
+        confirm.setContentText("This will remove all predecessor and successor relationships. Continue?");
+        
+        confirm.showAndWait().ifPresent(result -> {
+            if (result == ButtonType.OK) {
+                dependencyRepository.deleteByTaskId(task.getId());
+                loadDependencies();
+                refreshDisplay();
+            }
+        });
+    }
+    
     // Inner class for task bars
     private class TaskBar extends Rectangle {
         private final Task task;
@@ -1285,5 +1782,44 @@ public class GanttChartView {
     
     public void show() {
         stage.show();
+    }
+    
+    private Node createResourceBadge(String resourceName) {
+        // Create a container for the resource badge
+        StackPane badge = new StackPane();
+        badge.setAlignment(Pos.CENTER);
+        
+        // Create initials from resource name
+        String initials = getInitials(resourceName);
+        
+        // Create a circle background for the initials
+        Circle circle = new Circle(8);
+        circle.setFill(Color.web("#495057"));  // Dark gray for better visibility
+        circle.setStroke(Color.WHITE);
+        circle.setStrokeWidth(1.5);
+        
+        Text initialsText = new Text(initials);
+        initialsText.setFill(Color.WHITE);
+        initialsText.setFont(Font.font("System", FontWeight.BOLD, 8));
+        
+        badge.getChildren().addAll(circle, initialsText);
+        
+        // Add tooltip with full resource name
+        Tooltip.install(badge, new Tooltip(resourceName));
+        
+        return badge;
+    }
+    
+    private String getInitials(String name) {
+        if (name == null || name.trim().isEmpty()) {
+            return "?";
+        }
+        
+        String[] parts = name.trim().split("\\s+");
+        if (parts.length >= 2) {
+            return (parts[0].substring(0, 1) + parts[parts.length - 1].substring(0, 1)).toUpperCase();
+        } else {
+            return name.substring(0, Math.min(2, name.length())).toUpperCase();
+        }
     }
 }

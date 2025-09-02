@@ -17,6 +17,9 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.util.Callback;
+import javafx.stage.Window;
+import com.subliminalsearch.simpleprojectresourcemanager.util.DialogUtils;
+import com.subliminalsearch.simpleprojectresourcemanager.util.HelpButton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,12 +40,24 @@ public class ProjectDialog extends Dialog<Project> {
     private final CheckBox autoGenerateCheckBox;
     private final Button generateButton;
     
+    // Special project type radio buttons
+    private final RadioButton normalProjectRadio;
+    private final RadioButton shopProjectRadio;
+    private final RadioButton trainingProjectRadio;
+    private final ToggleGroup projectTypeGroup;
+    
+    // Travel checkbox
+    private final CheckBox travelCheckBox;
+    
     // Client contact fields
     private final TextField contactNameField;
     private final TextField contactEmailField;
     private final TextField contactPhoneField;
     private final TextField contactCompanyField;
     private final TextField contactRoleField;
+    private final TextField contactAddressField;
+    private final TextField clientProjectIdField;
+    private final TextField clientProjectDescriptionField;
     private final CheckBox sendReportsCheckBox;
     private final ComboBox<String> reportFrequencyCombo;
     
@@ -90,6 +105,37 @@ public class ProjectDialog extends Dialog<Project> {
         autoGenerateCheckBox = new CheckBox("Auto-generate project number");
         generateButton = new Button("Generate");
         
+        // Initialize special project type radio buttons
+        projectTypeGroup = new ToggleGroup();
+        normalProjectRadio = new RadioButton("Normal Project");
+        shopProjectRadio = new RadioButton("SHOP");
+        trainingProjectRadio = new RadioButton("TRAINING");
+        
+        normalProjectRadio.setToggleGroup(projectTypeGroup);
+        shopProjectRadio.setToggleGroup(projectTypeGroup);
+        trainingProjectRadio.setToggleGroup(projectTypeGroup);
+        normalProjectRadio.setSelected(true);  // Default to normal project
+        
+        // Set up radio button listeners
+        projectTypeGroup.selectedToggleProperty().addListener((obs, oldVal, newVal) -> {
+            if (newVal == shopProjectRadio) {
+                projectIdField.setText("SHOP");
+                projectIdField.setDisable(true);
+                autoGenerateCheckBox.setDisable(true);
+                generateButton.setDisable(true);
+            } else if (newVal == trainingProjectRadio) {
+                projectIdField.setText("TRAINING");
+                projectIdField.setDisable(true);
+                autoGenerateCheckBox.setDisable(true);
+                generateButton.setDisable(true);
+            } else {
+                projectIdField.setDisable(false);
+                projectIdField.clear();
+                autoGenerateCheckBox.setDisable(false);
+                generateButton.setDisable(false);
+            }
+        });
+        
         descriptionField = new TextField();
         descriptionField.setPromptText("Project description");
         
@@ -127,6 +173,20 @@ public class ProjectDialog extends Dialog<Project> {
         statusCombo = new ComboBox<>(FXCollections.observableArrayList(ProjectStatus.values()));
         statusCombo.setValue(ProjectStatus.ACTIVE);
         
+        // Initialize travel checkbox
+        travelCheckBox = new CheckBox("Travel Project");
+        travelCheckBox.setSelected(false); // Default to non-travel
+        travelCheckBox.setTooltip(new Tooltip("Check if this is a field service project requiring travel"));
+        
+        // Add change listener to debug checkbox changes
+        travelCheckBox.selectedProperty().addListener((obs, wasSelected, isSelected) -> {
+            logger.info("=== TRAVEL CHECKBOX CHANGED ===");
+            logger.info("Travel checkbox: {} -> {} for project {}", 
+                wasSelected, isSelected, 
+                isEditMode && existingProject != null ? existingProject.getProjectId() : "new");
+            logger.info("================================");
+        });
+        
         // Initialize client contact fields
         contactNameField = new TextField();
         contactNameField.setPromptText("Client contact name");
@@ -142,6 +202,15 @@ public class ProjectDialog extends Dialog<Project> {
         
         contactRoleField = new TextField();
         contactRoleField.setPromptText("e.g., Project Manager, Owner");
+        
+        contactAddressField = new TextField();
+        contactAddressField.setPromptText("Client/project address for field work");
+        
+        clientProjectIdField = new TextField();
+        clientProjectIdField.setPromptText("Client's internal project ID/number");
+        
+        clientProjectDescriptionField = new TextField();
+        clientProjectDescriptionField.setPromptText("Client's project description/name");
         
         sendReportsCheckBox = new CheckBox("Send automated reports");
         sendReportsCheckBox.setSelected(true);
@@ -182,6 +251,19 @@ public class ProjectDialog extends Dialog<Project> {
             startDatePicker.setValue(existingProject.getStartDate());
             endDatePicker.setValue(existingProject.getEndDate());
             statusCombo.setValue(existingProject.getStatus());
+            boolean existingTravel = existingProject.isTravel();
+            logger.info("Loading existing project {} with travel={}", existingProject.getProjectId(), existingTravel);
+            travelCheckBox.setSelected(existingTravel);
+            logger.info("Set travel checkbox to: {}", travelCheckBox.isSelected());
+            
+            // Check if this is a SHOP or TRAINING project being edited
+            if ("SHOP".equalsIgnoreCase(existingProject.getProjectId())) {
+                shopProjectRadio.setSelected(true);
+                projectIdField.setDisable(true);
+            } else if ("TRAINING".equalsIgnoreCase(existingProject.getProjectId())) {
+                trainingProjectRadio.setSelected(true);
+                projectIdField.setDisable(true);
+            }
             
             // Set project manager if available
             if (existingProject.getProjectManagerId() != null && projectManagers != null) {
@@ -207,13 +289,22 @@ public class ProjectDialog extends Dialog<Project> {
             if (existingProject.getContactRole() != null) {
                 contactRoleField.setText(existingProject.getContactRole());
             }
+            if (existingProject.getContactAddress() != null) {
+                contactAddressField.setText(existingProject.getContactAddress());
+            }
+            if (existingProject.getClientProjectId() != null) {
+                clientProjectIdField.setText(existingProject.getClientProjectId());
+            }
+            if (existingProject.getClientProjectDescription() != null) {
+                clientProjectDescriptionField.setText(existingProject.getClientProjectDescription());
+            }
             sendReportsCheckBox.setSelected(existingProject.isSendReports());
             if (existingProject.getReportFrequency() != null) {
                 reportFrequencyCombo.setValue(existingProject.getReportFrequency());
             }
             
-            // Disable project ID field in edit mode
-            projectIdField.setDisable(true);
+            // Allow editing project ID in edit mode
+            // projectIdField.setDisable(true);  // Removed to allow editing
         }
         
         // Create form layout with tabs
@@ -221,7 +312,44 @@ public class ProjectDialog extends Dialog<Project> {
         
         // Set up dialog pane
         getDialogPane().setContent(tabPane);
-        getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+        
+        // Create custom Help button type
+        ButtonType helpButtonType = new ButtonType("Help", ButtonBar.ButtonData.HELP);
+        getDialogPane().getButtonTypes().addAll(helpButtonType, ButtonType.OK, ButtonType.CANCEL);
+        
+        // Configure help button
+        Button helpBtn = (Button) getDialogPane().lookupButton(helpButtonType);
+        helpBtn.setOnAction(e -> {
+            HelpButton.showHelpDialog(
+                "Project Dialog Help",
+                "**Project Management**\n\n" +
+                "**Basic Information Tab:**\n" +
+                "• **Project Number:** Unique identifier (can auto-generate)\n" +
+                "• **Description:** Brief project description\n" +
+                "• **Project Manager:** Assigned PM from dropdown\n" +
+                "• **Start/End Dates:** Project timeline\n" +
+                "• **Status:** Active, On Hold, or Completed\n\n" +
+                "**Client Contact Tab:**\n" +
+                "• **Contact Name:** Primary client contact\n" +
+                "• **Email:** Multiple emails separated by semicolon\n" +
+                "• **Phone:** Auto-formatted phone number\n" +
+                "• **Company:** Client organization\n" +
+                "• **Role:** Contact's position/title\n" +
+                "• **Automated Reports:** Enable/disable email reports\n" +
+                "• **Report Frequency:** Daily, Weekly, or Monthly\n\n" +
+                "**Validation Rules:**\n" +
+                "• Project number must be unique\n" +
+                "• End date must be after start date\n" +
+                "• Email addresses must be valid format\n" +
+                "• Phone numbers auto-format to (XXX) XXX-XXXX\n\n" +
+                "**Tips:**\n" +
+                "• Use auto-generate for sequential project numbers\n" +
+                "• Add multiple email addresses for CC recipients\n" +
+                "• Set status to 'On Hold' for paused projects",
+                getDialogPane().getScene().getWindow()
+            );
+            e.consume(); // Prevent dialog from closing
+        });
         
         // Enable/disable OK button based on validation
         Button okButton = (Button) getDialogPane().lookupButton(ButtonType.OK);
@@ -246,9 +374,9 @@ public class ProjectDialog extends Dialog<Project> {
     }
     
     private void setupValidation() {
-        // Project ID validation
+        // Project ID validation - validate in both new and edit modes
         projectIdField.textProperty().addListener((obs, oldVal, newVal) -> {
-            if (!isEditMode && newVal != null && !newVal.trim().isEmpty()) {
+            if (newVal != null && !newVal.trim().isEmpty()) {
                 ValidationResult result = InputValidator.validateProjectId(newVal);
                 updateFieldValidation(projectIdField, projectIdErrorLabel, result);
             }
@@ -408,11 +536,54 @@ public class ProjectDialog extends Dialog<Project> {
         
         int row = 0;
         
+        // Project Type radio buttons (for new projects, or when editing SHOP/TRAINING)
+        boolean showRadioButtons = !isEditMode;
+        if (isEditMode && existingProject != null) {
+            String pid = existingProject.getProjectId();
+            if ("SHOP".equalsIgnoreCase(pid) || "TRAINING".equalsIgnoreCase(pid)) {
+                showRadioButtons = true;
+            }
+        }
+        
+        if (showRadioButtons) {
+            grid.add(new Label("Project Type:"), 0, row);
+            HBox radioBox = new HBox(15);
+            radioBox.getChildren().addAll(normalProjectRadio, shopProjectRadio, trainingProjectRadio);
+            grid.add(radioBox, 1, row);
+            row++;
+            
+            // Disable radio buttons in edit mode
+            if (isEditMode) {
+                normalProjectRadio.setDisable(true);
+                shopProjectRadio.setDisable(true);
+                trainingProjectRadio.setDisable(true);
+            }
+        }
+        
+        // Database ID (only show in edit mode)
+        if (isEditMode) {
+            grid.add(new Label("Database ID:"), 0, row);
+            Label idLabel = new Label();
+            if (existingProject != null) {
+                idLabel.setText(String.valueOf(existingProject.getId()));
+            }
+            idLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: #2196F3;");
+            grid.add(idLabel, 1, row);
+            row++;
+        }
+        
         // Project ID
         grid.add(new Label("Project ID:"), 0, row);
         VBox projectIdContainer = new VBox(3);
         HBox projectIdBox = new HBox(5);
-        projectIdBox.getChildren().addAll(projectIdField, generateButton);
+        
+        // Only show Generate button for new projects
+        if (!isEditMode) {
+            projectIdBox.getChildren().addAll(projectIdField, generateButton);
+        } else {
+            projectIdBox.getChildren().add(projectIdField);
+        }
+        
         HBox.setHgrow(projectIdField, Priority.ALWAYS);
         projectIdContainer.getChildren().addAll(projectIdBox, projectIdErrorLabel);
         grid.add(projectIdContainer, 1, row);
@@ -451,6 +622,11 @@ public class ProjectDialog extends Dialog<Project> {
         // Status
         grid.add(new Label("Status:"), 0, row);
         grid.add(statusCombo, 1, row);
+        row++;
+        
+        // Travel checkbox
+        grid.add(new Label("Travel:"), 0, row);
+        grid.add(travelCheckBox, 1, row);
         row++;
         
         return grid;
@@ -502,6 +678,31 @@ public class ProjectDialog extends Dialog<Project> {
         phoneBox.getChildren().addAll(contactPhoneField, phoneErrorLabel);
         grid.add(phoneBox, 1, row);
         GridPane.setHgrow(phoneBox, Priority.ALWAYS);
+        row++;
+        
+        // Address
+        grid.add(new Label("Address:"), 0, row);
+        grid.add(contactAddressField, 1, row);
+        GridPane.setHgrow(contactAddressField, Priority.ALWAYS);
+        row++;
+        
+        // Separator for Client Project section
+        Separator clientSeparator = new Separator();
+        grid.add(clientSeparator, 0, row++, 2, 1);
+        
+        // Client Project Information
+        grid.add(new Label("Client Project Info:"), 0, row++, 2, 1);
+        
+        // Client Project ID
+        grid.add(new Label("Client Project ID:"), 0, row);
+        grid.add(clientProjectIdField, 1, row);
+        GridPane.setHgrow(clientProjectIdField, Priority.ALWAYS);
+        row++;
+        
+        // Client Project Description
+        grid.add(new Label("Client Project Description:"), 0, row);
+        grid.add(clientProjectDescriptionField, 1, row);
+        GridPane.setHgrow(clientProjectDescriptionField, Priority.ALWAYS);
         row++;
         
         // Separator
@@ -588,7 +789,9 @@ public class ProjectDialog extends Dialog<Project> {
     
     private Callback<ButtonType, Project> createResultConverter() {
         return dialogButton -> {
+            logger.info("Result converter called with button type: {}", dialogButton);
             if (dialogButton == ButtonType.OK) {
+                logger.info("OK button clicked, processing project data");
                 try {
                     Project project;
                     
@@ -599,6 +802,13 @@ public class ProjectDialog extends Dialog<Project> {
                         project.setStartDate(startDatePicker.getValue());
                         project.setEndDate(endDatePicker.getValue());
                         project.setStatus(statusCombo.getValue());
+                        boolean travelSelected = travelCheckBox.isSelected();
+                        logger.info("=== SAVING PROJECT (mode: {}) ===", isEditMode ? "EDIT" : "NEW");
+                        logger.info("Travel checkbox isSelected(): {}", travelSelected);
+                        logger.info("Project {} BEFORE setTravel: isTravel={}", project.getProjectId(), project.isTravel());
+                        project.setTravel(travelSelected);
+                        logger.info("Project {} AFTER setTravel: isTravel={}", project.getProjectId(), project.isTravel());
+                        logger.info("=================================");
                         
                         // Set project manager ID
                         if (projectManagerCombo.getValue() != null) {
@@ -611,6 +821,9 @@ public class ProjectDialog extends Dialog<Project> {
                         project.setContactPhone(PhoneFormatter.getUnformattedPhone(contactPhoneField));
                         project.setContactCompany(contactCompanyField.getText().trim());
                         project.setContactRole(contactRoleField.getText().trim());
+                        project.setContactAddress(contactAddressField.getText().trim());
+                        project.setClientProjectId(clientProjectIdField.getText().trim());
+                        project.setClientProjectDescription(clientProjectDescriptionField.getText().trim());
                         project.setSendReports(sendReportsCheckBox.isSelected());
                         project.setReportFrequency(reportFrequencyCombo.getValue());
                     } else {
@@ -622,6 +835,13 @@ public class ProjectDialog extends Dialog<Project> {
                             endDatePicker.getValue()
                         );
                         project.setStatus(statusCombo.getValue());
+                        boolean travelSelected = travelCheckBox.isSelected();
+                        logger.info("=== SAVING PROJECT (mode: {}) ===", isEditMode ? "EDIT" : "NEW");
+                        logger.info("Travel checkbox isSelected(): {}", travelSelected);
+                        logger.info("Project {} BEFORE setTravel: isTravel={}", project.getProjectId(), project.isTravel());
+                        project.setTravel(travelSelected);
+                        logger.info("Project {} AFTER setTravel: isTravel={}", project.getProjectId(), project.isTravel());
+                        logger.info("=================================");
                         
                         // Set project manager ID
                         if (projectManagerCombo.getValue() != null) {
@@ -634,10 +854,16 @@ public class ProjectDialog extends Dialog<Project> {
                         project.setContactPhone(PhoneFormatter.getUnformattedPhone(contactPhoneField));
                         project.setContactCompany(contactCompanyField.getText().trim());
                         project.setContactRole(contactRoleField.getText().trim());
+                        project.setContactAddress(contactAddressField.getText().trim());
+                        project.setClientProjectId(clientProjectIdField.getText().trim());
+                        project.setClientProjectDescription(clientProjectDescriptionField.getText().trim());
                         project.setSendReports(sendReportsCheckBox.isSelected());
                         project.setReportFrequency(reportFrequencyCombo.getValue());
                     }
                     
+                    logger.info("About to return project {} with travel={} (checkbox state: {})", 
+                        project.getProjectId(), project.isTravel(), travelCheckBox.isSelected());
+                    logger.info("Project object hash: {}", System.identityHashCode(project));
                     return project;
                     
                 } catch (Exception e) {
@@ -675,6 +901,13 @@ public class ProjectDialog extends Dialog<Project> {
      * Show project details in a read-only dialog
      */
     public static void showProjectDetails(Project project) {
+        showProjectDetails(project, null);
+    }
+    
+    /**
+     * Show project details in a read-only dialog with owner window
+     */
+    public static void showProjectDetails(Project project, Window owner) {
         Dialog<Void> dialog = new Dialog<>();
         dialog.setTitle("Project Details");
         dialog.setHeaderText(project.getProjectId() + " - " + project.getDescription());
@@ -695,6 +928,9 @@ public class ProjectDialog extends Dialog<Project> {
         dialog.getDialogPane().setContent(content);
         dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
         dialog.getDialogPane().setPrefWidth(400);
+        
+        // Use DialogUtils for screen-aware positioning
+        DialogUtils.initializeDialog(dialog, owner);
         
         dialog.showAndWait();
     }

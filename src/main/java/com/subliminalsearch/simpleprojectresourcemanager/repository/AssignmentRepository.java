@@ -25,8 +25,8 @@ public class AssignmentRepository implements BaseRepository<Assignment, Long> {
         String sql = """
             INSERT INTO assignments (project_id, resource_id, start_date, end_date, 
                                    travel_out_days, travel_back_days, is_override, 
-                                   override_reason, notes, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                   override_reason, notes, location, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """;
         
         try (Connection conn = dataSource.getConnection();
@@ -41,8 +41,9 @@ public class AssignmentRepository implements BaseRepository<Assignment, Long> {
             stmt.setBoolean(7, assignment.isOverride());
             stmt.setString(8, assignment.getOverrideReason());
             stmt.setString(9, assignment.getNotes());
-            stmt.setTimestamp(10, Timestamp.valueOf(assignment.getCreatedAt()));
-            stmt.setTimestamp(11, Timestamp.valueOf(assignment.getUpdatedAt()));
+            stmt.setString(10, assignment.getLocation());
+            stmt.setTimestamp(11, Timestamp.valueOf(assignment.getCreatedAt()));
+            stmt.setTimestamp(12, Timestamp.valueOf(assignment.getUpdatedAt()));
             
             int affectedRows = stmt.executeUpdate();
             if (affectedRows == 0) {
@@ -74,7 +75,7 @@ public class AssignmentRepository implements BaseRepository<Assignment, Long> {
             UPDATE assignments 
             SET project_id = ?, resource_id = ?, start_date = ?, end_date = ?, 
                 travel_out_days = ?, travel_back_days = ?, is_override = ?, 
-                override_reason = ?, notes = ?, updated_at = ?
+                override_reason = ?, notes = ?, location = ?, updated_at = ?
             WHERE id = ?
             """;
         
@@ -92,8 +93,9 @@ public class AssignmentRepository implements BaseRepository<Assignment, Long> {
             stmt.setBoolean(7, assignment.isOverride());
             stmt.setString(8, assignment.getOverrideReason());
             stmt.setString(9, assignment.getNotes());
-            stmt.setTimestamp(10, Timestamp.valueOf(assignment.getUpdatedAt()));
-            stmt.setLong(11, assignment.getId());
+            stmt.setString(10, assignment.getLocation());
+            stmt.setTimestamp(11, Timestamp.valueOf(assignment.getUpdatedAt()));
+            stmt.setLong(12, assignment.getId());
             
             int affectedRows = stmt.executeUpdate();
             if (affectedRows == 0) {
@@ -313,6 +315,14 @@ public class AssignmentRepository implements BaseRepository<Assignment, Long> {
         assignment.setOverride(rs.getBoolean("is_override"));
         assignment.setOverrideReason(rs.getString("override_reason"));
         assignment.setNotes(rs.getString("notes"));
+        
+        // Try to read location field - may not exist in older databases
+        try {
+            assignment.setLocation(rs.getString("location"));
+        } catch (SQLException e) {
+            // Column doesn't exist yet, ignore
+        }
+        
         assignment.setCreatedAt(rs.getTimestamp("created_at").toLocalDateTime());
         assignment.setUpdatedAt(rs.getTimestamp("updated_at").toLocalDateTime());
         return assignment;

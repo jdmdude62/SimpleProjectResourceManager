@@ -59,8 +59,8 @@ public class SchedulerApplication extends Application {
         
         FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("/fxml/main-view.fxml"));
         
-        // Create and inject the main controller
-        mainController = new MainController(schedulingService);
+        // Create and inject the main controller with shared database config
+        mainController = new MainController(schedulingService, databaseConfig);
         fxmlLoader.setController(mainController);
         
         Scene scene = new Scene(fxmlLoader.load(), 1200, 800);

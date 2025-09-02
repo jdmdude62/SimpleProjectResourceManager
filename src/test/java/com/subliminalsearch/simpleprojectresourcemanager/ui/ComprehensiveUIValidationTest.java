@@ -2,10 +2,15 @@ package com.subliminalsearch.simpleprojectresourcemanager.ui;
 
 import com.subliminalsearch.simpleprojectresourcemanager.SchedulerApplication;
 import com.subliminalsearch.simpleprojectresourcemanager.ui.framework.UITestFramework;
+import javafx.scene.input.KeyCode;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.*;
 import org.testfx.api.FxToolkit;
+import org.testfx.matcher.base.NodeMatchers;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.testfx.api.FxAssert.verifyThat;
 
+import java.time.LocalDate;
 import java.util.concurrent.TimeoutException;
 
 @DisplayName("Comprehensive UI Input Validation Tests")

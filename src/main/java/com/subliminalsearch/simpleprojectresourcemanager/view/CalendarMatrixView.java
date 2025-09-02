@@ -14,6 +14,7 @@ import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.scene.text.Text;
 import javafx.stage.Stage;
+import com.subliminalsearch.simpleprojectresourcemanager.util.DialogUtils;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -41,6 +42,10 @@ public class CalendarMatrixView {
     private LocalDate currentDayView;
     
     public CalendarMatrixView(Project project, TaskRepository taskRepository, ResourceRepository resourceRepository) {
+        this(project, taskRepository, resourceRepository, null);
+    }
+    
+    public CalendarMatrixView(Project project, TaskRepository taskRepository, ResourceRepository resourceRepository, javafx.stage.Window owner) {
         this.project = project;
         this.taskRepository = taskRepository;
         this.resourceRepository = resourceRepository;
@@ -49,10 +54,14 @@ public class CalendarMatrixView {
         this.currentWeekStart = LocalDate.now().with(java.time.DayOfWeek.SUNDAY);
         this.currentDayView = LocalDate.now();
         
-        initialize();
+        if (owner != null) {
+            this.stage.initOwner(owner);
+        }
+        
+        initialize(owner);
     }
     
-    private void initialize() {
+    private void initialize(javafx.stage.Window owner) {
         stage.setTitle("Calendar Matrix - " + project.getProjectId());
         
         VBox root = new VBox(10);
@@ -83,6 +92,13 @@ public class CalendarMatrixView {
         stage.setScene(scene);
         stage.setMinWidth(1200);
         stage.setMinHeight(700);
+        
+        // Position on the same screen as owner
+        if (owner != null) {
+            DialogUtils.positionStageOnOwnerScreen(stage, owner, 0.9, 0.85);
+        } else {
+            stage.centerOnScreen();
+        }
         
         loadTaskData();
         buildCalendar();
@@ -1040,6 +1056,18 @@ public class CalendarMatrixView {
     
     public void show() {
         stage.show();
-        stage.centerOnScreen();
+        stage.toFront();
+        stage.requestFocus();
+        // Temporarily set always on top to ensure it appears above the Task List
+        stage.setAlwaysOnTop(true);
+        // Remove always on top after a short delay
+        javafx.application.Platform.runLater(() -> {
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                // Ignore
+            }
+            javafx.application.Platform.runLater(() -> stage.setAlwaysOnTop(false));
+        });
     }
 }

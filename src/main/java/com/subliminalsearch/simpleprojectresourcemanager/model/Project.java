@@ -21,6 +21,9 @@ public class Project {
     private String contactPhone;
     private String contactCompany;
     private String contactRole;
+    private String contactAddress;  // Client/project address for field work
+    private String clientProjectId;  // Client's internal project ID
+    private String clientProjectDescription;  // Client's project description
     private boolean sendReports = true;
     private String reportFrequency = "WEEKLY";  // DAILY, WEEKLY, BIWEEKLY, MONTHLY
     private LocalDateTime lastReportSent;
@@ -35,6 +38,7 @@ public class Project {
     private Double travelCost;
     private Double otherCost;
     private String costNotes;
+    private boolean isTravel = false; // Default to false, will be set to true for imported projects
 
     public Project() {
         this.status = ProjectStatus.ACTIVE;
@@ -186,6 +190,33 @@ public class Project {
         this.contactRole = contactRole;
         this.updatedAt = LocalDateTime.now();
     }
+    
+    public String getContactAddress() {
+        return contactAddress;
+    }
+    
+    public void setContactAddress(String contactAddress) {
+        this.contactAddress = contactAddress;
+        this.updatedAt = LocalDateTime.now();
+    }
+    
+    public String getClientProjectId() {
+        return clientProjectId;
+    }
+    
+    public void setClientProjectId(String clientProjectId) {
+        this.clientProjectId = clientProjectId;
+        this.updatedAt = LocalDateTime.now();
+    }
+    
+    public String getClientProjectDescription() {
+        return clientProjectDescription;
+    }
+    
+    public void setClientProjectDescription(String clientProjectDescription) {
+        this.clientProjectDescription = clientProjectDescription;
+        this.updatedAt = LocalDateTime.now();
+    }
 
     public boolean isSendReports() {
         return sendReports;
@@ -292,6 +323,15 @@ public class Project {
 
     public void setCostNotes(String costNotes) {
         this.costNotes = costNotes;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public boolean isTravel() {
+        return isTravel;
+    }
+
+    public void setTravel(boolean travel) {
+        isTravel = travel;
         this.updatedAt = LocalDateTime.now();
     }
 

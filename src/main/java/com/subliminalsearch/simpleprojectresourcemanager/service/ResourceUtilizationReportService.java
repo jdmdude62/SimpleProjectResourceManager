@@ -1,6 +1,7 @@
 package com.subliminalsearch.simpleprojectresourcemanager.service;
 
 import com.subliminalsearch.simpleprojectresourcemanager.model.*;
+import java.time.DayOfWeek;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
@@ -28,14 +29,22 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 public class ResourceUtilizationReportService {
     private static final Logger logger = LoggerFactory.getLogger(ResourceUtilizationReportService.class);
     private final SchedulingService schedulingService;
+    private final UtilizationService utilizationService;
     
     public ResourceUtilizationReportService(SchedulingService schedulingService) {
         this.schedulingService = schedulingService;
+        this.utilizationService = new UtilizationService(schedulingService.getDataSource());
+    }
+    
+    public ResourceUtilizationReportService(SchedulingService schedulingService, UtilizationService utilizationService) {
+        this.schedulingService = schedulingService;
+        this.utilizationService = utilizationService;
     }
     
     public File generateReport(boolean includeCharts, boolean showDetails) throws IOException, SQLException {
@@ -452,9 +461,16 @@ public class ResourceUtilizationReportService {
     
     private double calculateResourceUtilization(Resource resource, List<Assignment> assignments,
                                                LocalDate startDate, LocalDate endDate) {
-        int assignedDays = 0;
-        int availableDays = (int) ChronoUnit.DAYS.between(startDate, endDate) + 1;
+        // Get available days based on utilization settings
+        long availableDays = utilizationService.calculateAvailableDays(startDate, endDate);
+        if (availableDays == 0) return 0;
         
+        // Get company holidays for working days calculation
+        // Note: For now we'll pass null for holidays. In production, these would be loaded from the database
+        List<CompanyHoliday> holidays = null;
+        
+        // Calculate assigned days considering utilization settings
+        long assignedDays = 0;
         for (Assignment assignment : assignments) {
             LocalDate assignStart = assignment.getStartDate().isBefore(startDate) ? 
                                    startDate : assignment.getStartDate();
@@ -462,7 +478,23 @@ public class ResourceUtilizationReportService {
                                  endDate : assignment.getEndDate();
             
             if (!assignStart.isAfter(endDate) && !assignEnd.isBefore(startDate)) {
-                assignedDays += ChronoUnit.DAYS.between(assignStart, assignEnd) + 1;
+                // Get the project to check if it counts as utilized
+                try {
+                    Optional<Project> projectOpt = schedulingService.getProjectById(assignment.getProjectId());
+                    if (projectOpt.isPresent() && utilizationService.countsAsUtilized(projectOpt.get().getProjectId())) {
+                        // Count working days if configured, otherwise calendar days
+                        if (utilizationService.getSettings().getCalculationMethod() == 
+                            UtilizationSettings.CalculationMethod.WORKING_DAYS) {
+                            assignedDays += utilizationService.calculateWorkingDays(assignStart, assignEnd, holidays);
+                        } else {
+                            assignedDays += ChronoUnit.DAYS.between(assignStart, assignEnd) + 1;
+                        }
+                    }
+                } catch (Exception e) {
+                    logger.warn("Could not load project for assignment " + assignment.getId(), e);
+                    // Fall back to counting the days
+                    assignedDays += ChronoUnit.DAYS.between(assignStart, assignEnd) + 1;
+                }
             }
         }
         
@@ -470,39 +502,43 @@ public class ResourceUtilizationReportService {
     }
     
     private int calculateAssignedHours(List<Assignment> assignments, LocalDate startDate, LocalDate endDate) {
-        int totalHours = 0;
+        double totalHours = 0;
+        
+        // Get company holidays for working days calculation
+        // Note: For now we'll pass null for holidays. In production, these would be loaded from the database
+        List<CompanyHoliday> holidays = null;
+        
         for (Assignment assignment : assignments) {
             if (!assignment.getStartDate().isAfter(endDate) && !assignment.getEndDate().isBefore(startDate)) {
                 LocalDate effectiveStart = assignment.getStartDate().isBefore(startDate) ? 
                                           startDate : assignment.getStartDate();
                 LocalDate effectiveEnd = assignment.getEndDate().isAfter(endDate) ? 
                                         endDate : assignment.getEndDate();
-                int days = (int) ChronoUnit.DAYS.between(effectiveStart, effectiveEnd) + 1;
-                totalHours += days * 8; // Assuming 8 hours per day
+                
+                // Use working days if configured
+                if (utilizationService.getSettings().getCalculationMethod() == 
+                    UtilizationSettings.CalculationMethod.WORKING_DAYS) {
+                    long days = utilizationService.calculateWorkingDays(effectiveStart, effectiveEnd, holidays);
+                    totalHours += days * utilizationService.getSettings().getHoursPerDay();
+                } else {
+                    int days = (int) ChronoUnit.DAYS.between(effectiveStart, effectiveEnd) + 1;
+                    totalHours += days * utilizationService.getSettings().getHoursPerDay();
+                }
             }
         }
-        return totalHours;
+        return (int) totalHours;
     }
     
     private int calculateAvailableHours(LocalDate startDate, LocalDate endDate) {
-        int days = (int) ChronoUnit.DAYS.between(startDate, endDate) + 1;
-        int weekdays = 0;
-        LocalDate current = startDate;
-        
-        while (!current.isAfter(endDate)) {
-            if (current.getDayOfWeek().getValue() <= 5) { // Monday to Friday
-                weekdays++;
-            }
-            current = current.plusDays(1);
-        }
-        
-        return weekdays * 8; // 8 hours per weekday
+        return (int) utilizationService.calculateAvailableHours(startDate, endDate);
     }
     
     private String getUtilizationStatus(double utilization) {
-        if (utilization > 80) return "Over-utilized";
-        if (utilization < 40) return "Under-utilized";
-        return "Optimal";
+        UtilizationSettings settings = utilizationService.getSettings();
+        if (utilization >= settings.getOverallocationAlert()) return "Over-allocated";
+        if (utilization >= settings.getTargetUtilization()) return "Optimal";
+        if (utilization >= settings.getMinimumUtilization()) return "Below Target";
+        return "Under-utilized";
     }
     
     private int countOverUtilizedResources(List<Resource> resources, List<Assignment> assignments,

@@ -2,6 +2,8 @@ package com.subliminalsearch.simpleprojectresourcemanager.service;
 
 import com.subliminalsearch.simpleprojectresourcemanager.model.*;
 import com.subliminalsearch.simpleprojectresourcemanager.repository.ProjectRepository;
+import com.subliminalsearch.simpleprojectresourcemanager.util.FinancialCalculator;
+import com.subliminalsearch.simpleprojectresourcemanager.util.FinancialCalculator.FinancialSummary;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -11,6 +13,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 public class FinancialService {
     private static final Logger logger = LoggerFactory.getLogger(FinancialService.class);
@@ -544,5 +547,93 @@ public class FinancialService {
         co.setImpactDescription(rs.getString("impact_description"));
         
         return co;
+    }
+    
+    /**
+     * Get comprehensive financial summary for a project using centralized calculations
+     * This ensures consistency across all views and reports
+     */
+    public FinancialSummary getProjectFinancialSummary(Long projectId) {
+        try {
+            Optional<Project> projectOpt = projectRepository.findById(projectId);
+            if (projectOpt.isEmpty()) {
+                logger.warn("Project not found for financial summary: {}", projectId);
+                return null;
+            }
+            
+            Project project = projectOpt.get();
+            List<ActualCost> actualCosts = getActualCostsForProject(projectId);
+            List<PurchaseOrder> purchaseOrders = getPurchaseOrdersForProject(projectId);
+            List<ChangeOrder> changeOrders = getChangeOrdersForProject(projectId);
+            
+            return FinancialCalculator.calculateProjectFinancials(
+                project, actualCosts, purchaseOrders, changeOrders);
+        } catch (Exception e) {
+            logger.error("Error calculating financial summary for project {}", projectId, e);
+            return null;
+        }
+    }
+    
+    /**
+     * Validate financial data for a project
+     * Returns list of warnings/issues found
+     */
+    public List<String> validateProjectFinancials(Long projectId) {
+        try {
+            Optional<Project> projectOpt = projectRepository.findById(projectId);
+            if (projectOpt.isEmpty()) {
+                return List.of("Project not found: " + projectId);
+            }
+            
+            Project project = projectOpt.get();
+            List<ActualCost> actualCosts = getActualCostsForProject(projectId);
+            List<PurchaseOrder> purchaseOrders = getPurchaseOrdersForProject(projectId);
+            
+            return FinancialCalculator.validateFinancialData(project, actualCosts, purchaseOrders);
+        } catch (Exception e) {
+            logger.error("Error validating financial data for project {}", projectId, e);
+            return List.of("Error during validation: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Get burn rate for a project
+     */
+    public double getProjectBurnRate(Long projectId) {
+        try {
+            Optional<Project> projectOpt = projectRepository.findById(projectId);
+            if (projectOpt.isEmpty()) return 0.0;
+            
+            Project project = projectOpt.get();
+            List<ActualCost> actualCosts = getActualCostsForProject(projectId);
+            return FinancialCalculator.calculateBurnRate(project, actualCosts);
+        } catch (Exception e) {
+            logger.error("Error calculating burn rate for project {}", projectId, e);
+            return 0.0;
+        }
+    }
+    
+    /**
+     * Project budget depletion date based on current burn rate
+     */
+    public LocalDate projectBudgetDepletionDate(Long projectId) {
+        try {
+            Optional<Project> projectOpt = projectRepository.findById(projectId);
+            if (projectOpt.isEmpty()) return null;
+            
+            Project project = projectOpt.get();
+            List<ActualCost> actualCosts = getActualCostsForProject(projectId);
+            double burnRate = FinancialCalculator.calculateBurnRate(project, actualCosts);
+            
+            double totalSpent = actualCosts.stream()
+                .filter(c -> c.getStatus() != ActualCost.CostStatus.DISPUTED)
+                .mapToDouble(c -> c.getAmount() != null ? c.getAmount() : 0.0)
+                .sum();
+            
+            return FinancialCalculator.projectBudgetDepletion(project, burnRate, totalSpent);
+        } catch (Exception e) {
+            logger.error("Error calculating budget depletion for project {}", projectId, e);
+            return null;
+        }
     }
 }

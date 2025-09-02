@@ -41,7 +41,7 @@ class FinancialServiceSimpleTest {
             stmt.execute("""
                 CREATE TABLE IF NOT EXISTS projects (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    project_id TEXT UNIQUE NOT NULL,
+                    project_id TEXT NOT NULL,
                     description TEXT,
                     project_manager_id INTEGER,
                     start_date TEXT NOT NULL,
@@ -57,6 +57,7 @@ class FinancialServiceSimpleTest {
                     contact_phone TEXT,
                     contact_company TEXT,
                     contact_role TEXT,
+                    contact_address TEXT,
                     send_reports BOOLEAN DEFAULT 1,
                     report_frequency TEXT DEFAULT 'WEEKLY',
                     last_report_sent TIMESTAMP,
@@ -65,7 +66,8 @@ class FinancialServiceSimpleTest {
                     material_cost REAL,
                     travel_cost REAL,
                     other_cost REAL,
-                    cost_notes TEXT
+                    cost_notes TEXT,
+                    is_travel BOOLEAN DEFAULT 0
                 )
             """);
         }

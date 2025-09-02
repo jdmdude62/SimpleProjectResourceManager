@@ -15,6 +15,7 @@ public class Assignment {
     private boolean isOverride;
     private String overrideReason;
     private String notes;
+    private String location;  // Location/phase for multi-location projects
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -23,8 +24,8 @@ public class Assignment {
     private Resource resource;
 
     public Assignment() {
-        this.travelOutDays = 1;
-        this.travelBackDays = 1;
+        this.travelOutDays = 0;
+        this.travelBackDays = 0;
         this.isOverride = false;
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
@@ -148,6 +149,15 @@ public class Assignment {
 
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+    
+    public String getLocation() {
+        return location;
+    }
+    
+    public void setLocation(String location) {
+        this.location = location;
+        this.updatedAt = LocalDateTime.now();
     }
 
     public Project getProject() {

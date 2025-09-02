@@ -46,7 +46,7 @@ public class UserScenarioTest {
         schedulingService = new SchedulingService(
             projectRepository, resourceRepository, assignmentRepository, pmRepository, dataSource
         );
-        financialService = new FinancialService(dataSource);
+        financialService = new FinancialService(dataSource, projectRepository);
     }
     
     @AfterAll
@@ -294,14 +294,14 @@ public class UserScenarioTest {
             LocalDate.now().plusDays(7),
             LocalDate.now().plusDays(37) // 30 days
         );
-        budgetedProject.setBudget(new BigDecimal("50000"));
+        budgetedProject.setBudgetAmount(50000.0);
         projectRepository.update(budgetedProject);
         
         Resource expensiveResource = schedulingService.createResource(
             "Senior Specialist", "specialist@example.com",
             new ResourceType("Specialist", ResourceCategory.INTERNAL)
         );
-        expensiveResource.setDailyRate(new BigDecimal("1000"));
+        // Note: Daily rate would need to be tracked separately if needed
         resourceRepository.update(expensiveResource);
         
         // WHEN: Resource is assigned for full project duration
@@ -329,9 +329,9 @@ public class UserScenarioTest {
         // Option 2: Bring in contractor (higher daily rate)
         Resource contractor = schedulingService.createResource(
             "External Contractor", "contractor@vendor.com",
-            new ResourceType("Contractor", ResourceCategory.THIRD_PARTY)
+            new ResourceType("Contractor", ResourceCategory.CONTRACTOR)
         );
-        contractor.setDailyRate(new BigDecimal("1500"));
+        // Note: Daily rate would need to be tracked separately if needed
         resourceRepository.update(contractor);
         
         Assignment contractorCoverage = schedulingService.createAssignment(

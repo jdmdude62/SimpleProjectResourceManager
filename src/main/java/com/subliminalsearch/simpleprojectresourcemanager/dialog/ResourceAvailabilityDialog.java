@@ -12,6 +12,8 @@ import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
+import javafx.stage.Window;
+import com.subliminalsearch.simpleprojectresourcemanager.util.DialogUtils;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -250,6 +252,10 @@ public class ResourceAvailabilityDialog extends Dialog<Void> {
             null
         );
         
+        // Initialize dialog position to same screen as parent
+        Window owner = getDialogPane().getScene().getWindow();
+        DialogUtils.initializeDialog(dialog, owner);
+        
         Optional<TechnicianUnavailability> result = dialog.showAndWait();
         if (result.isPresent()) {
             TechnicianUnavailability unavailability = result.get();
@@ -277,6 +283,10 @@ public class ResourceAvailabilityDialog extends Dialog<Void> {
             resource,
             selected
         );
+        
+        // Initialize dialog position to same screen as parent
+        Window owner = getDialogPane().getScene().getWindow();
+        DialogUtils.initializeDialog(dialog, owner);
         
         Optional<TechnicianUnavailability> result = dialog.showAndWait();
         if (result.isPresent()) {
@@ -311,6 +321,10 @@ public class ResourceAvailabilityDialog extends Dialog<Void> {
             selected.getEndDate().format(DATE_FORMAT)
         ));
         
+        // Initialize dialog position to same screen as parent
+        Window owner = getDialogPane().getScene().getWindow();
+        DialogUtils.initializeDialog(confirm, owner);
+        
         Optional<ButtonType> result = confirm.showAndWait();
         if (result.isPresent() && result.get() == ButtonType.OK) {
             schedulingService.deleteUnavailability(selected.getId());
@@ -325,6 +339,10 @@ public class ResourceAvailabilityDialog extends Dialog<Void> {
         Dialog<Void> summaryDialog = new Dialog<>();
         summaryDialog.setTitle("All Resources Unavailability Summary");
         summaryDialog.setHeaderText("Overview of all resource unavailability periods");
+        
+        // Initialize dialog position to same screen as parent
+        Window owner = getDialogPane().getScene().getWindow();
+        DialogUtils.initializeDialog(summaryDialog, owner);
         
         TextArea summaryText = new TextArea();
         summaryText.setEditable(false);
@@ -375,6 +393,11 @@ public class ResourceAvailabilityDialog extends Dialog<Void> {
         alert.setTitle(title);
         alert.setHeaderText(null);
         alert.setContentText(message);
+        
+        // Initialize dialog position to same screen as parent
+        Window owner = getDialogPane().getScene().getWindow();
+        DialogUtils.initializeDialog(alert, owner);
+        
         alert.showAndWait();
     }
 }

@@ -23,6 +23,10 @@ public class TaskRepository {
         this.dataSource = dataSource;
     }
     
+    public HikariDataSource getDataSource() {
+        return dataSource;
+    }
+    
     // Find the maximum planned_start date for a project
     public LocalDate findMaxDateForProject(Long projectId) {
         String sql = """

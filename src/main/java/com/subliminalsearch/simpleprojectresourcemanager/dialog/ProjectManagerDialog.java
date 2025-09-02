@@ -258,18 +258,18 @@ public class ProjectManagerDialog extends Dialog<ProjectManager> {
         dialog.setHeaderText("Manage Project Managers");
         dialog.setResizable(true);
         
-        // Force the dialog window to be much larger
+        // Set dialog window to more reasonable size
         DialogPane dialogPane = dialog.getDialogPane();
-        dialogPane.setMinHeight(900);
-        dialogPane.setMinWidth(1200);
-        dialogPane.setPrefSize(1400, 1000);
+        dialogPane.setMinHeight(600);
+        dialogPane.setMinWidth(800);
+        dialogPane.setPrefSize(900, 700);
         dialogPane.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
         
         // Also set on the dialog itself
-        dialog.setWidth(1400);
-        dialog.setHeight(1000);
+        dialog.setWidth(900);
+        dialog.setHeight(700);
         
-        // Create list view with larger dimensions
+        // Create list view with reduced dimensions (1/3 less height, 1/5 less width)
         ListView<ProjectManager> listView = new ListView<>();
         
         // Helper method to refresh the list
@@ -281,10 +281,12 @@ public class ProjectManagerDialog extends Dialog<ProjectManager> {
         
         // Initial population
         refreshList.run();
-        listView.setPrefHeight(800);
-        listView.setPrefWidth(1200);
-        listView.setMinHeight(700);
-        listView.setStyle("-fx-font-size: 16px;");
+        // Reduced from 800 to ~535 (1/3 less), and width from 1200 to 960 (1/5 less)
+        listView.setPrefHeight(400);
+        listView.setPrefWidth(600);
+        listView.setMinHeight(350);
+        listView.setMaxHeight(450);
+        listView.setStyle("-fx-font-size: 14px;");
         
         // Custom cell factory to show more info
         listView.setCellFactory(lv -> new ListCell<ProjectManager>() {
@@ -295,10 +297,10 @@ public class ProjectManagerDialog extends Dialog<ProjectManager> {
                     setText(null);
                     setGraphic(null);
                 } else {
-                    VBox vbox = new VBox(5);
-                    vbox.setPadding(new Insets(10));
+                    VBox vbox = new VBox(3);
+                    vbox.setPadding(new Insets(5));
                     Label nameLabel = new Label(item.getName());
-                    nameLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 20px;");
+                    nameLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 14px;");
                     
                     String details = "";
                     if (item.getDepartment() != null && !item.getDepartment().isEmpty()) {
@@ -313,25 +315,25 @@ public class ProjectManagerDialog extends Dialog<ProjectManager> {
                     
                     if (!details.isEmpty()) {
                         Label detailsLabel = new Label(details);
-                        detailsLabel.setStyle("-fx-font-size: 16px; -fx-text-fill: gray;");
+                        detailsLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: gray;");
                         vbox.getChildren().addAll(nameLabel, detailsLabel);
                     } else {
                         vbox.getChildren().add(nameLabel);
                     }
                     
-                    setPrefHeight(80);
+                    setPrefHeight(50);
                     setGraphic(vbox);
                 }
             }
         });
         
-        // Buttons with larger size
+        // Buttons with appropriate size
         Button addButton = new Button("Add New");
         Button editButton = new Button("Edit");
         Button deleteButton = new Button("Delete");
         
-        // Style buttons to be larger
-        String buttonStyle = "-fx-font-size: 18px; -fx-padding: 15px 30px;";
+        // Style buttons to match dialog size
+        String buttonStyle = "-fx-font-size: 14px; -fx-padding: 8px 15px;";
         addButton.setStyle(buttonStyle);
         editButton.setStyle(buttonStyle);
         deleteButton.setStyle(buttonStyle);
@@ -375,20 +377,20 @@ public class ProjectManagerDialog extends Dialog<ProjectManager> {
         });
         
         // Layout
-        HBox buttonBox = new HBox(30);
+        HBox buttonBox = new HBox(15);
         buttonBox.getChildren().addAll(addButton, editButton, deleteButton);
-        buttonBox.setPadding(new Insets(20, 0, 0, 0));
+        buttonBox.setPadding(new Insets(10, 0, 0, 0));
         
-        // Make buttons same width but much larger
-        addButton.setPrefWidth(200);
-        addButton.setPrefHeight(60);
-        editButton.setPrefWidth(200);
-        editButton.setPrefHeight(60);
-        deleteButton.setPrefWidth(200);
-        deleteButton.setPrefHeight(60);
+        // Make buttons same width but appropriately sized
+        addButton.setPrefWidth(120);
+        addButton.setPrefHeight(35);
+        editButton.setPrefWidth(120);
+        editButton.setPrefHeight(35);
+        deleteButton.setPrefWidth(120);
+        deleteButton.setPrefHeight(35);
         
-        VBox content = new VBox(30);
-        content.setPadding(new Insets(30));
+        VBox content = new VBox(15);
+        content.setPadding(new Insets(20));
         content.getChildren().addAll(listView, buttonBox);
         VBox.setVgrow(listView, Priority.ALWAYS);
         
@@ -396,15 +398,15 @@ public class ProjectManagerDialog extends Dialog<ProjectManager> {
         dialogPane.setContent(content);
         dialogPane.getButtonTypes().add(ButtonType.CLOSE);
         
-        // Apply inline styles to ensure the dialog is large
-        dialog.getDialogPane().setStyle("-fx-pref-width: 1400px; -fx-pref-height: 1000px; -fx-min-width: 1200px; -fx-min-height: 900px;");
+        // Apply inline styles to ensure proper dialog size
+        dialog.getDialogPane().setStyle("-fx-pref-width: 900px; -fx-pref-height: 700px; -fx-min-width: 800px; -fx-min-height: 600px;");
         
         // Force proper size before showing
         Stage stage = (Stage) dialog.getDialogPane().getScene().getWindow();
-        stage.setMinWidth(1400);
-        stage.setMinHeight(1000);
-        stage.setWidth(1400);
-        stage.setHeight(1000);
+        stage.setMinWidth(900);
+        stage.setMinHeight(700);
+        stage.setWidth(900);
+        stage.setHeight(700);
         stage.centerOnScreen();
         
         // Show the dialog

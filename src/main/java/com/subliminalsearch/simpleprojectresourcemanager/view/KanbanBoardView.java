@@ -4,6 +4,7 @@ import com.subliminalsearch.simpleprojectresourcemanager.model.Project;
 import com.subliminalsearch.simpleprojectresourcemanager.model.Resource;
 import com.subliminalsearch.simpleprojectresourcemanager.model.Task;
 import com.subliminalsearch.simpleprojectresourcemanager.repository.TaskRepository;
+import com.subliminalsearch.simpleprojectresourcemanager.util.DialogUtils;
 import javafx.animation.Animation;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
@@ -93,6 +94,10 @@ public class KanbanBoardView {
     );
     
     public KanbanBoardView(Project project, TaskRepository taskRepository, List<Resource> resources) {
+        this(project, taskRepository, resources, null);
+    }
+    
+    public KanbanBoardView(Project project, TaskRepository taskRepository, List<Resource> resources, javafx.stage.Window owner) {
         this.project = project;
         this.taskRepository = taskRepository;
         this.resources = resources;
@@ -102,13 +107,17 @@ public class KanbanBoardView {
         this.columnContainers = new HashMap<>();
         this.columnScrollPanes = new HashMap<>();
         
-        initialize();
+        if (owner != null) {
+            this.stage.initOwner(owner);
+        }
+        
+        initialize(owner);
         System.out.println("After initialize(), columnMap size: " + columnMap.size());
         System.out.println("columnMap contents: " + columnMap.keySet());
         loadTasks();
     }
     
-    private void initialize() {
+    private void initialize(javafx.stage.Window owner) {
         VBox root = new VBox(10);
         root.setPadding(new Insets(15));
         
@@ -153,7 +162,13 @@ public class KanbanBoardView {
         stage.setScene(scene);
         stage.setMinWidth(1400);
         stage.setMinHeight(700);
-        stage.centerOnScreen();
+        
+        // Position on the same screen as owner
+        if (owner != null) {
+            DialogUtils.positionStageOnOwnerScreen(stage, owner, 0.9, 0.85);
+        } else {
+            stage.centerOnScreen();
+        }
         
         // Cleanup on close
         stage.setOnHidden(e -> {
@@ -1405,7 +1420,7 @@ public class KanbanBoardView {
     
     private void showGanttChart() {
         // Open Gantt Chart view
-        GanttChartView ganttChart = new GanttChartView(project, taskRepository, resources);
+        GanttChartView ganttChart = new GanttChartView(project, taskRepository, null, resources, stage);
         ganttChart.show();
     }
     

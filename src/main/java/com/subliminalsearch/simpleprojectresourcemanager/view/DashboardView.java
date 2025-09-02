@@ -3,6 +3,7 @@ package com.subliminalsearch.simpleprojectresourcemanager.view;
 import com.subliminalsearch.simpleprojectresourcemanager.model.*;
 import com.subliminalsearch.simpleprojectresourcemanager.repository.ResourceRepository;
 import com.subliminalsearch.simpleprojectresourcemanager.repository.TaskRepository;
+import com.subliminalsearch.simpleprojectresourcemanager.util.DialogUtils;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
@@ -33,15 +34,23 @@ public class DashboardView {
     private List<Resource> allResources;
     
     public DashboardView(Project project, TaskRepository taskRepository, ResourceRepository resourceRepository) {
+        this(project, taskRepository, resourceRepository, null);
+    }
+    
+    public DashboardView(Project project, TaskRepository taskRepository, ResourceRepository resourceRepository, javafx.stage.Window owner) {
         this.project = project;
         this.taskRepository = taskRepository;
         this.resourceRepository = resourceRepository;
         this.stage = new Stage();
         
-        initialize();
+        if (owner != null) {
+            this.stage.initOwner(owner);
+        }
+        
+        initialize(owner);
     }
     
-    private void initialize() {
+    private void initialize(javafx.stage.Window owner) {
         stage.setTitle("Project Dashboard - " + project.getProjectId());
         
         ScrollPane scrollPane = new ScrollPane();
@@ -63,6 +72,13 @@ public class DashboardView {
         stage.setMinWidth(1000);
         stage.setMinHeight(600);
         stage.setMaximized(false);
+        
+        // Position on the same screen as owner
+        if (owner != null) {
+            DialogUtils.positionStageOnOwnerScreen(stage, owner, 0.9, 0.85);
+        } else {
+            stage.centerOnScreen();
+        }
     }
     
     private void loadData() {
@@ -668,7 +684,6 @@ public class DashboardView {
     
     public void show() {
         stage.show();
-        stage.centerOnScreen();
         stage.toFront();
         stage.requestFocus();
         // Temporarily set always on top to ensure it appears above the Task List

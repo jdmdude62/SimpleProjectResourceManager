@@ -293,3 +293,8 @@ src/main/resources/
 - Added Quick Entry for batch cost input
 - Fixed dialog sizing to match Timeline view
 - Integrated financial tracking via project context menu
+- Fixed is_travel checkbox to properly save when editing projects
+- Implemented complete Open Items module with Grid and Kanban views
+- Added industrial automation categories with autocomplete
+- Fixed Open Items persistence issues with proper null handling
+- Implemented drag-and-drop functionality in Kanban board

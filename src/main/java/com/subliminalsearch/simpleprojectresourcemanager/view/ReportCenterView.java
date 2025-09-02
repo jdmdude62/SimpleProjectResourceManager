@@ -2,6 +2,7 @@ package com.subliminalsearch.simpleprojectresourcemanager.view;
 
 import com.subliminalsearch.simpleprojectresourcemanager.model.*;
 import com.subliminalsearch.simpleprojectresourcemanager.service.*;
+import com.subliminalsearch.simpleprojectresourcemanager.util.DialogUtils;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -36,6 +37,7 @@ public class ReportCenterView extends Stage {
     private static final Logger logger = LoggerFactory.getLogger(ReportCenterView.class);
     
     private final SchedulingService schedulingService;
+    private UtilizationService utilizationService;
     private final TabPane reportTabs;
     private final ProgressBar progressBar;
     private final Label statusLabel;
@@ -77,12 +79,23 @@ public class ReportCenterView extends Stage {
     private Project preloadProject = null;
     
     public ReportCenterView(SchedulingService schedulingService) {
-        this(schedulingService, null);
+        this(schedulingService, null, null);
     }
     
     public ReportCenterView(SchedulingService schedulingService, Project projectToPreload) {
+        this(schedulingService, projectToPreload, null);
+    }
+    
+    public ReportCenterView(SchedulingService schedulingService, Project projectToPreload, javafx.stage.Window owner) {
         this.schedulingService = schedulingService;
         this.preloadProject = projectToPreload;
+        
+        if (owner != null) {
+            initOwner(owner);
+        }
+        
+        // Initialize utilization service
+        this.utilizationService = new UtilizationService(schedulingService.getDataSource());
         
         // Initialize date pickers before creating toolbar
         this.startDatePicker = new DatePicker(LocalDate.now().minusMonths(1));
@@ -90,7 +103,7 @@ public class ReportCenterView extends Stage {
         
         // Initialize report services
         this.clientReportService = new ClientReportService();
-        this.resourceReportService = new ResourceUtilizationReportService(schedulingService);
+        this.resourceReportService = new ResourceUtilizationReportService(schedulingService, utilizationService);
         this.pipelineReportService = new ProjectPipelineReportService(schedulingService);
         this.revenueReportService = new RevenueReportService(schedulingService);
         this.geographicReportService = new GeographicReportService(schedulingService);
@@ -133,11 +146,15 @@ public class ReportCenterView extends Stage {
         // Set stage size constraints
         setMinWidth(1400);
         setMinHeight(800);
-        setWidth(1600);
-        setHeight(900);
         
-        // Center on screen
-        centerOnScreen();
+        // Position on the same screen as owner
+        if (owner != null) {
+            DialogUtils.positionStageOnOwnerScreen(this, owner, 0.95, 0.9);
+        } else {
+            setWidth(1600);
+            setHeight(900);
+            centerOnScreen();
+        }
         
         // If a project was provided, preload its previews
         if (preloadProject != null) {

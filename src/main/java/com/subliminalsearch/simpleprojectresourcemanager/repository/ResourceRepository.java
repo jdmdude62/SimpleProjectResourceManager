@@ -64,7 +64,7 @@ public class ResourceRepository implements BaseRepository<Resource, Long> {
     public void update(Resource resource) {
         String sql = """
             UPDATE resources 
-            SET name = ?, email = ?, phone = ?, resource_type_id = ?, is_active = ?
+            SET name = ?, email = ?, phone = ?, resource_type_id = ?, is_active = ?, ldap_username = ?
             WHERE id = ?
             """;
         
@@ -76,7 +76,8 @@ public class ResourceRepository implements BaseRepository<Resource, Long> {
             stmt.setString(3, resource.getPhone());
             stmt.setObject(4, resource.getResourceType() != null ? resource.getResourceType().getId() : null);
             stmt.setBoolean(5, resource.isActive());
-            stmt.setLong(6, resource.getId());
+            stmt.setString(6, resource.getLdapUsername());
+            stmt.setLong(7, resource.getId());
             
             int affectedRows = stmt.executeUpdate();
             if (affectedRows == 0) {
@@ -290,6 +291,14 @@ public class ResourceRepository implements BaseRepository<Resource, Long> {
         resource.setPhone(rs.getString("phone"));
         resource.setActive(rs.getBoolean("is_active"));
         resource.setCreatedAt(rs.getTimestamp("created_at").toLocalDateTime());
+        
+        // Map LDAP username if present
+        try {
+            resource.setLdapUsername(rs.getString("ldap_username"));
+        } catch (SQLException e) {
+            // Column might not exist in older databases
+            logger.debug("ldap_username column not found, skipping");
+        }
         
         // Map resource type if present
         String typeName = rs.getString("type_name");

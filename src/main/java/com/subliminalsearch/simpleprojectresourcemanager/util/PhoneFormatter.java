@@ -17,10 +17,22 @@ public class PhoneFormatter {
      */
     public static void applyPhoneFormat(TextField phoneField) {
         UnaryOperator<TextFormatter.Change> phoneFilter = change -> {
+            // If this is a programmatic change (like setText), accept it as-is
+            if (!change.isContentChange()) {
+                return change;
+            }
+            
             String newText = change.getControlNewText();
             
             // Remove all non-digits for processing
             String digitsOnly = newText.replaceAll("[^\\d]", "");
+            
+            // Allow complete clearing of the field
+            if (digitsOnly.isEmpty()) {
+                change.setText("");
+                change.setRange(0, change.getControlText().length());
+                return change;
+            }
             
             // Limit to 10 digits (US phone number without country code)
             if (digitsOnly.length() > 10) {
@@ -30,15 +42,19 @@ public class PhoneFormatter {
             // Format the number
             String formatted = formatPhoneNumber(digitsOnly);
             
-            // Calculate new caret position
-            int caretPosition = calculateCaretPosition(change.getCaretPosition(), 
-                                                       change.getControlText(), 
-                                                       formatted);
+            // If the formatted text is the same as what's already there, don't change it
+            if (formatted.equals(change.getControlText())) {
+                return change;
+            }
+            
+            // Calculate where the caret should be after formatting
+            int originalCaret = change.getCaretPosition();
+            int newCaret = calculateNewCaretPosition(digitsOnly, originalCaret, change.isDeleted());
             
             change.setText(formatted);
             change.setRange(0, change.getControlText().length());
-            change.setCaretPosition(caretPosition);
-            change.setAnchor(caretPosition);
+            change.setCaretPosition(newCaret);
+            change.setAnchor(newCaret);
             
             return change;
         };
@@ -90,7 +106,13 @@ public class PhoneFormatter {
         StringBuilder formatted = new StringBuilder();
         int len = digitsOnly.length();
         
-        if (len > 0) {
+        // Don't add formatting for very short numbers (less than complete area code)
+        if (len == 1 || len == 2) {
+            // Just show the digits without formatting
+            return digitsOnly;
+        }
+        
+        if (len >= 3) {
             formatted.append("(");
         }
         
@@ -151,6 +173,27 @@ public class PhoneFormatter {
         }
         
         return newPosition;
+    }
+    
+    /**
+     * Calculate new caret position based on number of digits and whether deleting
+     */
+    private static int calculateNewCaretPosition(String digitsOnly, int originalCaret, boolean isDeleting) {
+        // Count how many digits we have typed so far
+        int digitCount = digitsOnly.length();
+        
+        // Position the caret after formatting
+        if (digitCount == 0) {
+            return 0; // Empty field
+        } else if (digitCount <= 2) {
+            return digitCount; // No formatting yet
+        } else if (digitCount <= 3) {
+            return digitCount + 1; // Inside area code with parenthesis
+        } else if (digitCount <= 6) {
+            return digitCount + 3; // After ") " and inside first 3 digits
+        } else {
+            return digitCount + 4; // After ") " and "-"
+        }
     }
     
     /**

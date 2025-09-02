@@ -11,6 +11,9 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.util.Callback;
+import javafx.stage.Window;
+import com.subliminalsearch.simpleprojectresourcemanager.util.DialogUtils;
+import com.subliminalsearch.simpleprojectresourcemanager.util.HelpButton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -22,7 +25,7 @@ public class ResourceDialog extends Dialog<Resource> {
     private final TextField nameField;
     private final TextField emailField;
     private final ComboBox<ResourceCategory> categoryCombo;
-    private final TextField typeNameField;
+    private final ComboBox<String> typeCombo;
     private final CheckBox activeCheckBox;
     
     private final boolean isEditMode;
@@ -49,8 +52,10 @@ public class ResourceDialog extends Dialog<Resource> {
         categoryCombo = new ComboBox<>(FXCollections.observableArrayList(ResourceCategory.values()));
         categoryCombo.setValue(ResourceCategory.INTERNAL);
         
-        typeNameField = new TextField();
-        typeNameField.setPromptText("e.g., Full-Time Employee, Contractor, Vendor");
+        typeCombo = new ComboBox<>();
+        typeCombo.setEditable(true); // Allow custom entries if needed
+        typeCombo.setPromptText("Select or enter resource type");
+        updateTypeOptions(ResourceCategory.INTERNAL); // Set initial options
         
         activeCheckBox = new CheckBox("Active");
         activeCheckBox.setSelected(true);
@@ -62,20 +67,16 @@ public class ResourceDialog extends Dialog<Resource> {
             
             if (existingResource.getResourceType() != null) {
                 categoryCombo.setValue(existingResource.getResourceType().getCategory());
-                typeNameField.setText(existingResource.getResourceType().getName());
+                typeCombo.setValue(existingResource.getResourceType().getName());
             }
             
             activeCheckBox.setSelected(existingResource.isActive());
         }
         
-        // Set default type name based on category selection
+        // Update type options based on category selection
         categoryCombo.valueProperty().addListener((obs, oldVal, newVal) -> {
-            if (newVal != null && typeNameField.getText().isEmpty()) {
-                switch (newVal) {
-                    case INTERNAL -> typeNameField.setText("Full-Time Employee");
-                    case CONTRACTOR -> typeNameField.setText("Contractor");
-                    case VENDOR -> typeNameField.setText("Vendor");
-                }
+            if (newVal != null) {
+                updateTypeOptions(newVal);
             }
         });
         
@@ -84,7 +85,48 @@ public class ResourceDialog extends Dialog<Resource> {
         
         // Set up dialog pane
         getDialogPane().setContent(grid);
-        getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+        
+        // Create custom Help button type
+        ButtonType helpButtonType = new ButtonType("Help", ButtonBar.ButtonData.HELP);
+        getDialogPane().getButtonTypes().addAll(helpButtonType, ButtonType.OK, ButtonType.CANCEL);
+        
+        // Configure help button
+        Button helpBtn = (Button) getDialogPane().lookupButton(helpButtonType);
+        helpBtn.setOnAction(e -> {
+            HelpButton.showHelpDialog(
+                "Resource Dialog Help",
+                "**Resource Management**\n\n" +
+                "**Resource Details:**\n" +
+                "• **Name:** Full name for employees or company name for vendors\n" +
+                "• **Email:** Contact email address\n" +
+                "• **Category:** Resource classification\n" +
+                "  - Internal: Full-time employees\n" +
+                "  - Contractor: External contractors\n" +
+                "  - Vendor: Third-party vendors\n" +
+                "• **Type:** Specific role or classification\n" +
+                "• **Active:** Enable/disable resource availability\n\n" +
+                "**Categories Explained:**\n" +
+                "• **Internal Resources:**\n" +
+                "  - Company employees\n" +
+                "  - Direct payroll\n" +
+                "  - Full availability tracking\n\n" +
+                "• **Contractors:**\n" +
+                "  - External professionals\n" +
+                "  - Project-based work\n" +
+                "  - Limited availability\n\n" +
+                "• **Vendors:**\n" +
+                "  - Service providers\n" +
+                "  - Equipment suppliers\n" +
+                "  - Specialized services\n\n" +
+                "**Best Practices:**\n" +
+                "• Use consistent naming conventions\n" +
+                "• Include valid email for notifications\n" +
+                "• Deactivate instead of deleting resources\n" +
+                "• Update type to reflect actual role",
+                getDialogPane().getScene().getWindow()
+            );
+            e.consume(); // Prevent dialog from closing
+        });
         
         // Enable/disable OK button based on validation
         Button okButton = (Button) getDialogPane().lookupButton(ButtonType.OK);
@@ -97,7 +139,9 @@ public class ResourceDialog extends Dialog<Resource> {
             okButton.setDisable(!isValidInput()));
         categoryCombo.valueProperty().addListener((obs, oldVal, newVal) -> 
             okButton.setDisable(!isValidInput()));
-        typeNameField.textProperty().addListener((obs, oldVal, newVal) -> 
+        typeCombo.valueProperty().addListener((obs, oldVal, newVal) -> 
+            okButton.setDisable(!isValidInput()));
+        typeCombo.getEditor().textProperty().addListener((obs, oldVal, newVal) -> 
             okButton.setDisable(!isValidInput()));
         
         // Set result converter
@@ -106,6 +150,77 @@ public class ResourceDialog extends Dialog<Resource> {
         // Set dialog size
         getDialogPane().setPrefWidth(500);
         getDialogPane().setPrefHeight(450);
+    }
+    
+    private void updateTypeOptions(ResourceCategory category) {
+        // Store current value to restore if it's still valid
+        String currentValue = typeCombo.getValue();
+        if (currentValue == null || currentValue.isEmpty()) {
+            currentValue = typeCombo.getEditor().getText();
+        }
+        
+        // Clear and set new options based on category
+        typeCombo.getItems().clear();
+        
+        switch (category) {
+            case INTERNAL:
+                typeCombo.getItems().addAll(
+                    "Full-Time Employee",
+                    "Part-Time Employee",
+                    "Intern",
+                    "Temporary Employee",
+                    "Manager",
+                    "Technician",
+                    "Engineer",
+                    "Support Staff"
+                );
+                if (currentValue == null || currentValue.isEmpty()) {
+                    typeCombo.setValue("Full-Time Employee");
+                }
+                break;
+                
+            case CONTRACTOR:
+                typeCombo.getItems().addAll(
+                    "Independent Contractor",
+                    "Consultant",
+                    "Freelancer",
+                    "Subcontractor",
+                    "Project-Based Contractor",
+                    "Hourly Contractor",
+                    "Specialist",
+                    "Technical Contractor"
+                );
+                if (currentValue == null || currentValue.isEmpty()) {
+                    typeCombo.setValue("Independent Contractor");
+                }
+                break;
+                
+            case VENDOR:
+                typeCombo.getItems().addAll(
+                    "Equipment Vendor",
+                    "Service Provider",
+                    "Material Supplier",
+                    "Software Vendor",
+                    "Maintenance Provider",
+                    "Consulting Firm",
+                    "Staffing Agency",
+                    "Third-Party Service"
+                );
+                if (currentValue == null || currentValue.isEmpty()) {
+                    typeCombo.setValue("Service Provider");
+                }
+                break;
+        }
+        
+        // Restore previous value if it exists in new list or if custom
+        if (currentValue != null && !currentValue.isEmpty()) {
+            if (typeCombo.getItems().contains(currentValue)) {
+                typeCombo.setValue(currentValue);
+            } else {
+                // It's a custom value, keep it
+                typeCombo.setValue(currentValue);
+            }
+        }
     }
     
     private GridPane createFormLayout() {
@@ -133,10 +248,11 @@ public class ResourceDialog extends Dialog<Resource> {
         grid.add(categoryCombo, 1, row);
         row++;
         
-        // Type Name
+        // Type
         grid.add(new Label("Type:"), 0, row);
-        grid.add(typeNameField, 1, row);
-        GridPane.setHgrow(typeNameField, Priority.ALWAYS);
+        grid.add(typeCombo, 1, row);
+        GridPane.setHgrow(typeCombo, Priority.ALWAYS);
+        typeCombo.setMaxWidth(Double.MAX_VALUE);
         row++;
         
         // Active checkbox
@@ -166,9 +282,14 @@ public class ResourceDialog extends Dialog<Resource> {
             return false;
         }
         
-        // Type name required
-        if (typeNameField.getText() == null || typeNameField.getText().trim().isEmpty()) {
-            return false;
+        // Type required
+        String typeValue = typeCombo.getValue();
+        if (typeValue == null || typeValue.trim().isEmpty()) {
+            // Check editor text if combo value is null (for custom entries)
+            typeValue = typeCombo.getEditor().getText();
+            if (typeValue == null || typeValue.trim().isEmpty()) {
+                return false;
+            }
         }
         
         return true;
@@ -181,8 +302,12 @@ public class ResourceDialog extends Dialog<Resource> {
                     Resource resource;
                     
                     // Create or get resource type
+                    String typeValue = typeCombo.getValue();
+                    if (typeValue == null || typeValue.isEmpty()) {
+                        typeValue = typeCombo.getEditor().getText();
+                    }
                     ResourceType resourceType = new ResourceType(
-                        typeNameField.getText().trim(),
+                        typeValue.trim(),
                         categoryCombo.getValue()
                     );
                     
@@ -241,6 +366,13 @@ public class ResourceDialog extends Dialog<Resource> {
      * Show resource details in a read-only dialog
      */
     public static void showResourceDetails(Resource resource) {
+        showResourceDetails(resource, null);
+    }
+    
+    /**
+     * Show resource details in a read-only dialog with owner window
+     */
+    public static void showResourceDetails(Resource resource, Window owner) {
         Dialog<Void> dialog = new Dialog<>();
         dialog.setTitle("Resource Details");
         dialog.setHeaderText(resource.getName());
@@ -263,6 +395,9 @@ public class ResourceDialog extends Dialog<Resource> {
         dialog.getDialogPane().setContent(content);
         dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
         dialog.getDialogPane().setPrefWidth(400);
+        
+        // Use DialogUtils for screen-aware positioning
+        DialogUtils.initializeDialog(dialog, owner);
         
         dialog.showAndWait();
     }

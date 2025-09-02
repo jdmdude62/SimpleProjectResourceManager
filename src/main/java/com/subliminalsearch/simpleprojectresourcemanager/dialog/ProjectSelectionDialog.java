@@ -74,7 +74,9 @@ public class ProjectSelectionDialog extends Dialog<Project> {
         // Create project combo box
         projectCombo = new ComboBox<>(filteredProjects);
         projectCombo.setConverter(createProjectStringConverter());
-        projectCombo.setPrefWidth(450);
+        projectCombo.setCellFactory(createProjectCellFactory());
+        projectCombo.setButtonCell(createProjectListCell());
+        projectCombo.setPrefWidth(500);
         projectCombo.setMaxWidth(Double.MAX_VALUE);
         
         // Select first project by default if available
@@ -105,9 +107,10 @@ public class ProjectSelectionDialog extends Dialog<Project> {
             return null;
         });
         
-        // Set dialog size
-        getDialogPane().setPrefWidth(550);
+        // Set dialog size - wider to accommodate the project info and count label
+        getDialogPane().setPrefWidth(700);
         getDialogPane().setPrefHeight(400);
+        getDialogPane().setMinWidth(650);
     }
     
     private void applyFilters() {
@@ -239,6 +242,7 @@ public class ProjectSelectionDialog extends Dialog<Project> {
         HBox projectBox = new HBox(10);
         Label projectCountLabel = new Label("(" + filteredProjects.size() + " projects)");
         projectCountLabel.setStyle("-fx-text-fill: #666; -fx-font-size: 11px;");
+        projectCountLabel.setMinWidth(80);  // Ensure label has minimum width to prevent truncation
         projectBox.getChildren().addAll(projectCombo, projectCountLabel);
         HBox.setHgrow(projectCombo, Priority.ALWAYS);
         grid.add(projectBox, 1, row);
@@ -297,6 +301,24 @@ public class ProjectSelectionDialog extends Dialog<Project> {
                     .filter(p -> (p.getProjectId() + " - " + p.getDescription()).equals(string))
                     .findFirst()
                     .orElse(null);
+            }
+        };
+    }
+    
+    private Callback<ListView<Project>, ListCell<Project>> createProjectCellFactory() {
+        return lv -> createProjectListCell();
+    }
+    
+    private ListCell<Project> createProjectListCell() {
+        return new ListCell<Project>() {
+            @Override
+            protected void updateItem(Project project, boolean empty) {
+                super.updateItem(project, empty);
+                if (empty || project == null) {
+                    setText(null);
+                } else {
+                    setText(project.getProjectId() + " - " + project.getDescription());
+                }
             }
         };
     }

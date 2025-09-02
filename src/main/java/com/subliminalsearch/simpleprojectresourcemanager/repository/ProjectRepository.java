@@ -28,8 +28,8 @@ public class ProjectRepository implements BaseRepository<Project, Long> {
         String sql = """
             INSERT INTO projects (project_id, description, project_manager_id, start_date, end_date, status,
                                 contact_name, contact_email, contact_phone, contact_company, contact_role,
-                                send_reports, report_frequency, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                contact_address, send_reports, report_frequency, is_travel, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """;
         
         try (Connection conn = dataSource.getConnection();
@@ -52,11 +52,15 @@ public class ProjectRepository implements BaseRepository<Project, Long> {
             stmt.setString(9, project.getContactPhone());
             stmt.setString(10, project.getContactCompany());
             stmt.setString(11, project.getContactRole());
-            stmt.setInt(12, project.isSendReports() ? 1 : 0);
-            stmt.setString(13, project.getReportFrequency());
+            stmt.setString(12, project.getContactAddress());
+            stmt.setInt(13, project.isSendReports() ? 1 : 0);
+            stmt.setString(14, project.getReportFrequency());
+            int travelValue = project.isTravel() ? 1 : 0;
+            logger.info("Creating project {} with travel={}", project.getProjectId(), travelValue);
+            stmt.setInt(15, travelValue);
             
-            stmt.setTimestamp(14, Timestamp.valueOf(project.getCreatedAt()));
-            stmt.setTimestamp(15, Timestamp.valueOf(project.getUpdatedAt()));
+            stmt.setTimestamp(16, Timestamp.valueOf(project.getCreatedAt()));
+            stmt.setTimestamp(17, Timestamp.valueOf(project.getUpdatedAt()));
             
             int affectedRows = stmt.executeUpdate();
             if (affectedRows == 0) {
@@ -82,47 +86,122 @@ public class ProjectRepository implements BaseRepository<Project, Long> {
 
     @Override
     public void update(Project project) {
-        String sql = """
-            UPDATE projects 
-            SET description = ?, project_manager_id = ?, start_date = ?, end_date = ?, status = ?,
-                contact_name = ?, contact_email = ?, contact_phone = ?, contact_company = ?, contact_role = ?,
-                send_reports = ?, report_frequency = ?, updated_at = ?
-            WHERE id = ?
-            """;
+        // Check if optional columns exist
+        boolean hasContactAddress = false;
+        boolean hasClientProjectFields = false;
+        try (Connection testConn = dataSource.getConnection()) {
+            DatabaseMetaData meta = testConn.getMetaData();
+            try (ResultSet rs = meta.getColumns(null, null, "projects", "contact_address")) {
+                hasContactAddress = rs.next();
+            }
+            try (ResultSet rs = meta.getColumns(null, null, "projects", "client_project_id")) {
+                hasClientProjectFields = rs.next();
+            }
+        } catch (SQLException e) {
+            logger.debug("Error checking for optional columns", e);
+        }
+        
+        final boolean useContactAddress = hasContactAddress;
+        final boolean useClientProjectFields = hasClientProjectFields;
+        String sql;
+        if (useContactAddress && useClientProjectFields) {
+            sql = """
+                UPDATE projects 
+                SET project_id = ?, description = ?, project_manager_id = ?, start_date = ?, end_date = ?, status = ?,
+                    contact_name = ?, contact_email = ?, contact_phone = ?, contact_company = ?, contact_role = ?,
+                    contact_address = ?, client_project_id = ?, client_project_description = ?, 
+                    send_reports = ?, report_frequency = ?, is_travel = ?, updated_at = ?
+                WHERE id = ?
+                """;
+        } else if (useContactAddress) {
+            sql = """
+                UPDATE projects 
+                SET project_id = ?, description = ?, project_manager_id = ?, start_date = ?, end_date = ?, status = ?,
+                    contact_name = ?, contact_email = ?, contact_phone = ?, contact_company = ?, contact_role = ?,
+                    contact_address = ?, send_reports = ?, report_frequency = ?, is_travel = ?, updated_at = ?
+                WHERE id = ?
+                """;
+        } else {
+            sql = """
+                UPDATE projects 
+                SET project_id = ?, description = ?, project_manager_id = ?, start_date = ?, end_date = ?, status = ?,
+                    contact_name = ?, contact_email = ?, contact_phone = ?, contact_company = ?, contact_role = ?,
+                    send_reports = ?, report_frequency = ?, is_travel = ?, updated_at = ?
+                WHERE id = ?
+                """;
+        }
         
         try (Connection conn = dataSource.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             
             project.setUpdatedAt(LocalDateTime.now());
             
-            stmt.setString(1, project.getDescription());
+            stmt.setString(1, project.getProjectId());
+            stmt.setString(2, project.getDescription());
             if (project.getProjectManagerId() != null) {
-                stmt.setLong(2, project.getProjectManagerId());
+                stmt.setLong(3, project.getProjectManagerId());
             } else {
-                stmt.setNull(2, Types.INTEGER);
+                stmt.setNull(3, Types.INTEGER);
             }
-            stmt.setString(3, project.getStartDate().toString());
-            stmt.setString(4, project.getEndDate().toString());
-            stmt.setString(5, project.getStatus().name());
+            stmt.setString(4, project.getStartDate().toString());
+            stmt.setString(5, project.getEndDate().toString());
+            stmt.setString(6, project.getStatus().name());
             
             // Client contact fields
-            stmt.setString(6, project.getContactName());
-            stmt.setString(7, project.getContactEmail());
-            stmt.setString(8, project.getContactPhone());
-            stmt.setString(9, project.getContactCompany());
-            stmt.setString(10, project.getContactRole());
-            stmt.setInt(11, project.isSendReports() ? 1 : 0);
-            stmt.setString(12, project.getReportFrequency());
+            int paramIndex = 7;
+            stmt.setString(paramIndex++, project.getContactName());
+            stmt.setString(paramIndex++, project.getContactEmail());
+            stmt.setString(paramIndex++, project.getContactPhone());
+            stmt.setString(paramIndex++, project.getContactCompany());
+            stmt.setString(paramIndex++, project.getContactRole());
             
-            stmt.setTimestamp(13, Timestamp.valueOf(project.getUpdatedAt()));
-            stmt.setLong(14, project.getId());
+            if (useContactAddress) {
+                stmt.setString(paramIndex++, project.getContactAddress());
+            }
+            
+            if (useClientProjectFields) {
+                stmt.setString(paramIndex++, project.getClientProjectId());
+                stmt.setString(paramIndex++, project.getClientProjectDescription());
+            }
+            
+            stmt.setInt(paramIndex++, project.isSendReports() ? 1 : 0);
+            stmt.setString(paramIndex++, project.getReportFrequency());
+            
+            int travelValue = project.isTravel() ? 1 : 0;
+            logger.info("Setting travel field to {} for project {} (ID: {}) at parameter index {}", 
+                travelValue, project.getProjectId(), project.getId(), paramIndex);
+            stmt.setInt(paramIndex++, travelValue);
+            
+            // Debug: Log the actual SQL being executed
+            logger.info("SQL UPDATE parameters: description='{}', PM={}, start={}, end={}, status={}, travel={} (index {}), id={}", 
+                project.getDescription(), project.getProjectManagerId(), project.getStartDate(), 
+                project.getEndDate(), project.getStatus(), travelValue, paramIndex-1, project.getId());
+            
+            stmt.setTimestamp(paramIndex++, Timestamp.valueOf(project.getUpdatedAt()));
+            stmt.setLong(paramIndex++, project.getId());
             
             int affectedRows = stmt.executeUpdate();
             if (affectedRows == 0) {
                 throw new SQLException("Updating project failed, project not found: " + project.getId());
             }
             
-            logger.info("Updated project: {}", project.getProjectId());
+            logger.info("Updated project: {} - {} rows affected", project.getProjectId(), affectedRows);
+            
+            // Immediately verify what was saved
+            try (PreparedStatement verifyStmt = conn.prepareStatement(
+                    "SELECT is_travel FROM projects WHERE id = ?")) {
+                verifyStmt.setLong(1, project.getId());
+                try (ResultSet rs = verifyStmt.executeQuery()) {
+                    if (rs.next()) {
+                        int savedTravel = rs.getInt("is_travel");
+                        logger.info("Verification: Project {} travel field in DB is now: {} (expected: {})", 
+                            project.getProjectId(), savedTravel, travelValue);
+                        if (savedTravel != travelValue) {
+                            logger.error("ERROR: Travel field mismatch! Sent {} but DB has {}", travelValue, savedTravel);
+                        }
+                    }
+                }
+            }
             
         } catch (SQLException e) {
             logger.error("Failed to update project: {}", project.getId(), e);
@@ -201,7 +280,17 @@ public class ProjectRepository implements BaseRepository<Project, Long> {
             
             try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
-                    return Optional.of(mapResultSetToProject(rs));
+                    // Debug: Check raw travel value before mapping
+                    try {
+                        int rawTravel = rs.getInt("is_travel");
+                        logger.info("findById({}): Raw is_travel value from DB: {}", id, rawTravel);
+                    } catch (Exception e) {
+                        logger.error("findById({}): Error reading is_travel: {}", id, e.getMessage());
+                    }
+                    
+                    Project project = mapResultSetToProject(rs);
+                    logger.info("findById({}): Mapped project travel value: {}", id, project.isTravel());
+                    return Optional.of(project);
                 }
                 return Optional.empty();
             }
@@ -409,6 +498,31 @@ public class ProjectRepository implements BaseRepository<Project, Long> {
         String contactRole = rs.getString("contact_role");
         if (contactRole != null) project.setContactRole(contactRole);
         
+        try {
+            String contactAddress = rs.getString("contact_address");
+            if (contactAddress != null) project.setContactAddress(contactAddress);
+        } catch (SQLException e) {
+            // Column might not exist in older schemas
+            logger.debug("contact_address column not found in result set", e);
+        }
+        
+        // Handle client project fields
+        try {
+            String clientProjectId = rs.getString("client_project_id");
+            if (clientProjectId != null) project.setClientProjectId(clientProjectId);
+        } catch (SQLException e) {
+            // Column might not exist in older schemas
+            logger.debug("client_project_id column not found in result set", e);
+        }
+        
+        try {
+            String clientProjectDescription = rs.getString("client_project_description");
+            if (clientProjectDescription != null) project.setClientProjectDescription(clientProjectDescription);
+        } catch (SQLException e) {
+            // Column might not exist in older schemas
+            logger.debug("client_project_description column not found in result set", e);
+        }
+        
         // Handle send_reports as integer (0/1)
         try {
             project.setSendReports(rs.getInt("send_reports") == 1);
@@ -419,6 +533,25 @@ public class ProjectRepository implements BaseRepository<Project, Long> {
         
         String reportFrequency = rs.getString("report_frequency");
         if (reportFrequency != null) project.setReportFrequency(reportFrequency);
+        
+        // Handle is_travel as integer (0/1)
+        try {
+            int travelInt = rs.getInt("is_travel");
+            boolean travelValue = (travelInt == 1);
+            project.setTravel(travelValue);
+            logger.info("Read travel field for project {} (ID: {}): {} (raw: {})", 
+                project.getProjectId(), project.getId(), travelValue, travelInt);
+            
+            // Double-check the value was actually set
+            if (project.isTravel() != travelValue) {
+                logger.error("ERROR: Travel field not set correctly! Expected {} but got {}", 
+                    travelValue, project.isTravel());
+            }
+        } catch (SQLException e) {
+            // Column might not exist in older schemas, default to false
+            logger.info("Could not read is_travel field for project {} - defaulting to false", project.getProjectId());
+            project.setTravel(false);
+        }
         
         // Load financial fields
         try {

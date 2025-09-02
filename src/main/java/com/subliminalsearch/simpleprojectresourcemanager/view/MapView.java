@@ -18,6 +18,7 @@ import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.stage.Stage;
+import com.subliminalsearch.simpleprojectresourcemanager.util.DialogUtils;
 
 import java.time.LocalDate;
 import java.util.*;
@@ -60,6 +61,10 @@ public class MapView {
     }
     
     public MapView(Project project, TaskRepository taskRepository, ResourceRepository resourceRepository, AssignmentRepository assignmentRepository) {
+        this(project, taskRepository, resourceRepository, assignmentRepository, null);
+    }
+    
+    public MapView(Project project, TaskRepository taskRepository, ResourceRepository resourceRepository, AssignmentRepository assignmentRepository, javafx.stage.Window owner) {
         this.project = project;
         this.taskRepository = taskRepository;
         this.resourceRepository = resourceRepository;
@@ -68,10 +73,14 @@ public class MapView {
         this.locations = new ArrayList<>();
         this.optimizedRoute = new ArrayList<>();
         
-        initialize();
+        if (owner != null) {
+            this.stage.initOwner(owner);
+        }
+        
+        initialize(owner);
     }
     
-    private void initialize() {
+    private void initialize(javafx.stage.Window owner) {
         stage.setTitle("Field Service Map - " + project.getProjectId());
         
         BorderPane root = new BorderPane();
@@ -103,6 +112,13 @@ public class MapView {
         stage.setScene(scene);
         stage.setMinWidth(1200);
         stage.setMinHeight(800);
+        
+        // Position on the same screen as owner
+        if (owner != null) {
+            DialogUtils.positionStageOnOwnerScreen(stage, owner, 0.9, 0.85);
+        } else {
+            stage.centerOnScreen();
+        }
         
         loadTaskLocations();
         generateMockLocations();
@@ -665,6 +681,18 @@ public class MapView {
     
     public void show() {
         stage.show();
-        stage.centerOnScreen();
+        stage.toFront();
+        stage.requestFocus();
+        // Temporarily set always on top to ensure it appears above the Task List
+        stage.setAlwaysOnTop(true);
+        // Remove always on top after a short delay
+        javafx.application.Platform.runLater(() -> {
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                // Ignore
+            }
+            javafx.application.Platform.runLater(() -> stage.setAlwaysOnTop(false));
+        });
     }
 }

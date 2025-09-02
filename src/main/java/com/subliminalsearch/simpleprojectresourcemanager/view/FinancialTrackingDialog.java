@@ -2,6 +2,8 @@ package com.subliminalsearch.simpleprojectresourcemanager.view;
 
 import com.subliminalsearch.simpleprojectresourcemanager.model.*;
 import com.subliminalsearch.simpleprojectresourcemanager.service.FinancialService;
+import com.subliminalsearch.simpleprojectresourcemanager.util.HelpButton;
+import com.subliminalsearch.simpleprojectresourcemanager.util.DialogUtils;
 import javafx.beans.property.SimpleDoubleProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
@@ -43,12 +45,25 @@ public class FinancialTrackingDialog extends Stage {
     private ObservableList<ChangeOrder> changeOrders;
     
     public FinancialTrackingDialog(Project project, FinancialService financialService) {
+        this(project, financialService, null);
+    }
+    
+    public FinancialTrackingDialog(Project project, FinancialService financialService, javafx.stage.Window owner) {
         this.project = project;
         this.financialService = financialService;
+        
+        if (owner != null) {
+            initOwner(owner);
+        }
         
         initializeData();
         setupUI();
         loadData();
+        
+        // Position on the same screen as owner
+        if (owner != null) {
+            DialogUtils.positionStageOnOwnerScreen(this, owner, 0.9, 0.85);
+        }
     }
     
     private void initializeData() {
@@ -63,9 +78,18 @@ public class FinancialTrackingDialog extends Stage {
         
         BorderPane root = new BorderPane();
         
-        // Top - Budget Summary
+        // Add help button in top-right corner
+        HBox topBar = new HBox();
+        topBar.setAlignment(Pos.CENTER_RIGHT);
+        topBar.setPadding(new Insets(5));
+        Button helpBtn = HelpButton.create("Financial Tracking", HelpButton.HelpContent.FINANCIAL_TRACKING);
+        topBar.getChildren().add(helpBtn);
+        
+        // Top - Budget Summary with help button
         VBox summaryBox = createBudgetSummary();
-        root.setTop(summaryBox);
+        VBox topSection = new VBox();
+        topSection.getChildren().addAll(topBar, summaryBox);
+        root.setTop(topSection);
         
         // Center - Tabs
         tabPane = new TabPane();
@@ -286,8 +310,11 @@ public class FinancialTrackingDialog extends Stage {
         Button editButton = new Button("Edit");
         Button deleteButton = new Button("Delete");
         Button approveButton = new Button("Approve");
+        Button recordInvoiceButton = new Button("Record Invoice");
+        recordInvoiceButton.setStyle("-fx-background-color: #4CAF50; -fx-text-fill: white;");
         
-        toolBar.getItems().addAll(addButton, editButton, deleteButton, new Separator(), approveButton);
+        toolBar.getItems().addAll(addButton, editButton, deleteButton, new Separator(), 
+                                  approveButton, recordInvoiceButton);
         pane.setTop(toolBar);
         
         // Table
@@ -337,6 +364,19 @@ public class FinancialTrackingDialog extends Stage {
             }
         });
         
+        recordInvoiceButton.setOnAction(e -> {
+            PurchaseOrder selected = table.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                showActualCostDialogForPO(selected);
+            } else {
+                Alert alert = new Alert(Alert.AlertType.WARNING);
+                alert.setTitle("No Selection");
+                alert.setHeaderText("No Purchase Order Selected");
+                alert.setContentText("Please select a Purchase Order to record an invoice for.");
+                alert.showAndWait();
+            }
+        });
+        
         deleteButton.setOnAction(e -> {
             PurchaseOrder selected = table.getSelectionModel().getSelectedItem();
             if (selected != null && confirmDelete("Delete this purchase order?")) {
@@ -352,7 +392,7 @@ public class FinancialTrackingDialog extends Stage {
     }
     
     private Tab createActualCostsTab() {
-        Tab tab = new Tab("Actual Costs");
+        Tab tab = new Tab("Invoices & Actuals");
         
         BorderPane pane = new BorderPane();
         
@@ -872,6 +912,26 @@ public class FinancialTrackingDialog extends Stage {
             loadActualCosts();
             updateBudgetSummary();
         });
+    }
+    
+    /**
+     * Show Actual Cost dialog pre-populated with PO information for recording an invoice
+     */
+    private void showActualCostDialogForPO(PurchaseOrder po) {
+        ActualCost newCost = new ActualCost();
+        newCost.setProjectId(project.getId());
+        newCost.setPurchaseOrderId(po.getId());
+        newCost.setDescription("Invoice for PO: " + po.getPoNumber() + " - " + po.getVendor());
+        newCost.setEstimatedAmount(po.getAmount()); // Pre-fill with PO amount
+        newCost.setCostDate(LocalDate.now());
+        newCost.setCategory(ActualCost.CostCategory.SUBCONTRACTOR); // Default for vendor invoices
+        newCost.setStatus(ActualCost.CostStatus.PENDING);
+        
+        // Open the dialog with pre-filled data
+        showActualCostDialog(newCost);
+        
+        // After dialog, switch to Invoices & Actuals tab to show the new entry
+        tabPane.getSelectionModel().select(2); // Select the Invoices & Actuals tab
     }
     
     private void showChangeOrderDialog(ChangeOrder co) {

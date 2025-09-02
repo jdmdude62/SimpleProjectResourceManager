@@ -23,8 +23,16 @@ module com.subliminalsearch.simpleprojectresourcemanager {
     requires org.apache.pdfbox;
     requires org.jfree.jfreechart;
     requires jakarta.mail;
+    
+    requires org.apache.poi.poi;
+    requires org.apache.poi.ooxml;
+    
+    requires com.microsoft.graph;
+    requires com.azure.identity;
+    requires com.azure.core;
 
     opens com.subliminalsearch.simpleprojectresourcemanager to javafx.fxml;
+    opens com.subliminalsearch.simpleprojectresourcemanager.integration.sharepoint to com.microsoft.graph;
     opens com.subliminalsearch.simpleprojectresourcemanager.controller to javafx.fxml;
     opens com.subliminalsearch.simpleprojectresourcemanager.model to com.fasterxml.jackson.databind;
     

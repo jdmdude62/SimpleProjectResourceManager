@@ -6,11 +6,17 @@ import com.subliminalsearch.simpleprojectresourcemanager.repository.ProjectManag
 import com.subliminalsearch.simpleprojectresourcemanager.repository.ProjectRepository;
 import com.subliminalsearch.simpleprojectresourcemanager.repository.ResourceRepository;
 import com.subliminalsearch.simpleprojectresourcemanager.repository.ResourceUnavailabilityRepository;
+import com.subliminalsearch.simpleprojectresourcemanager.repository.TaskRepository;
 import com.zaxxer.hikari.HikariDataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -25,6 +31,7 @@ public class SchedulingService {
     private final ResourceRepository resourceRepository;
     private final AssignmentRepository assignmentRepository;
     private final ProjectManagerRepository projectManagerRepository;
+    private final TaskRepository taskRepository;
     private ResourceUnavailabilityRepository unavailabilityRepository;
     private final HikariDataSource dataSource;
 
@@ -37,6 +44,7 @@ public class SchedulingService {
         this.resourceRepository = resourceRepository;
         this.assignmentRepository = assignmentRepository;
         this.projectManagerRepository = projectManagerRepository;
+        this.taskRepository = new TaskRepository(dataSource);
         this.dataSource = dataSource;
         // Initialize unavailability repository lazily to avoid issues in tests
         this.unavailabilityRepository = null;
@@ -74,14 +82,14 @@ public class SchedulingService {
     public Project createProject(String projectId, String description, LocalDate startDate, LocalDate endDate) {
         validateProjectDates(startDate, endDate);
         
-        if (projectRepository.existsByProjectId(projectId)) {
-            throw new IllegalArgumentException("Project with ID '" + projectId + "' already exists");
-        }
+        // No longer checking for duplicate project IDs - they are allowed now
+        // Multiple projects can have the same project ID (for different phases/locations)
+        // The database ID (auto-increment) is the unique identifier
         
         Project project = new Project(projectId, description, startDate, endDate);
         Project saved = projectRepository.save(project);
         
-        logger.info("Created project: {} - {}", projectId, description);
+        logger.info("Created project: {} - {} (ID: {})", projectId, description, saved.getId());
         return saved;
     }
 
@@ -102,8 +110,9 @@ public class SchedulingService {
             }
         }
         
+        logger.info("About to update project {} with travel={}", project.getProjectId(), project.isTravel());
         projectRepository.update(project);
-        logger.info("Updated project: {}", project.getProjectId());
+        logger.info("Updated project: {} with travel={}", project.getProjectId(), project.isTravel());
     }
 
     public void deleteProject(Long projectId) {
@@ -116,11 +125,80 @@ public class SchedulingService {
         List<Assignment> assignments = assignmentRepository.findByProjectId(projectId);
         if (!assignments.isEmpty()) {
             throw new IllegalArgumentException(
-                "Cannot delete project: " + assignments.size() + " assignments exist");
+                "Cannot delete project: " + assignments.size() + " assignments exist. Please delete assignments first.");
+        }
+        
+        // Check for tasks
+        List<com.subliminalsearch.simpleprojectresourcemanager.model.Task> tasks = taskRepository.findByProjectId(projectId);
+        if (!tasks.isEmpty()) {
+            // Delete tasks first (cascading)
+            for (com.subliminalsearch.simpleprojectresourcemanager.model.Task task : tasks) {
+                taskRepository.delete(task.getId());
+            }
+            logger.info("Deleted {} tasks for project {}", tasks.size(), projectId);
         }
         
         projectRepository.delete(projectId);
         logger.info("Deleted project: {}", project.get().getProjectId());
+    }
+    
+    public void deleteResource(Long resourceId) {
+        Optional<Resource> resource = resourceRepository.findById(resourceId);
+        if (resource.isEmpty()) {
+            throw new IllegalArgumentException("Resource not found: " + resourceId);
+        }
+        
+        // Check for existing assignments
+        List<Assignment> assignments = assignmentRepository.findByResourceId(resourceId);
+        if (!assignments.isEmpty()) {
+            throw new IllegalArgumentException(
+                "Cannot delete resource: " + assignments.size() + " assignments exist. Please delete assignments first.");
+        }
+        
+        // Delete resource skills and certifications (cascading)
+        // These should cascade automatically with foreign key constraints
+        
+        resourceRepository.delete(resourceId);
+        logger.info("Deleted resource: {}", resource.get().getName());
+    }
+    
+    public void deleteProjectWithAssignments(Long projectId) {
+        logger.info("Attempting to delete project with ID: {}", projectId);
+        
+        if (projectId == null) {
+            throw new IllegalArgumentException("Project ID is null");
+        }
+        
+        Optional<Project> project = projectRepository.findById(projectId);
+        if (project.isEmpty()) {
+            logger.error("Project not found in repository with ID: {}", projectId);
+            throw new IllegalArgumentException("Failed to find project with ID: " + projectId);
+        }
+        
+        logger.info("Found project to delete: {}", project.get().getProjectId());
+        
+        // First delete all assignments for this project
+        List<Assignment> assignments = assignmentRepository.findByProjectId(projectId);
+        int assignmentCount = assignments.size();
+        for (Assignment assignment : assignments) {
+            assignmentRepository.delete(assignment.getId());
+        }
+        if (assignmentCount > 0) {
+            logger.info("Deleted {} assignments for project {}", assignmentCount, project.get().getProjectId());
+        }
+        
+        // Delete tasks
+        List<com.subliminalsearch.simpleprojectresourcemanager.model.Task> tasks = taskRepository.findByProjectId(projectId);
+        for (com.subliminalsearch.simpleprojectresourcemanager.model.Task task : tasks) {
+            taskRepository.delete(task.getId());
+        }
+        if (!tasks.isEmpty()) {
+            logger.info("Deleted {} tasks for project {}", tasks.size(), projectId);
+        }
+        
+        // Now delete the project
+        projectRepository.delete(projectId);
+        logger.info("Deleted project: {} (with {} assignments)", project.get().getProjectId(), assignmentCount);
     }
 
     // Project Manager Management
@@ -172,10 +250,25 @@ public class SchedulingService {
         logger.info("Created resource: {} - {}", name, resourceType);
         return saved;
     }
+    
+    public Resource updateResource(Resource resource) {
+        if (resource.getId() == null) {
+            throw new IllegalArgumentException("Cannot update resource without ID");
+        }
+        
+        Optional<Resource> existing = resourceRepository.findById(resource.getId());
+        if (existing.isEmpty()) {
+            throw new IllegalArgumentException("Resource not found: " + resource.getId());
+        }
+        
+        Resource updated = resourceRepository.save(resource);
+        logger.info("Updated resource: {} - {}", updated.getName(), updated.getResourceType());
+        return updated;
+    }
 
     // Assignment Management
     public Assignment createAssignment(Long projectId, Long resourceId, LocalDate startDate, LocalDate endDate) {
-        return createAssignment(projectId, resourceId, startDate, endDate, 1, 1);
+        return createAssignment(projectId, resourceId, startDate, endDate, 0, 0);
     }
 
     public Assignment createAssignment(Long projectId, Long resourceId, LocalDate startDate, LocalDate endDate, 
@@ -183,6 +276,13 @@ public class SchedulingService {
         validateAssignmentInputs(projectId, resourceId, startDate, endDate, travelOutDays, travelBackDays);
         
         Assignment assignment = new Assignment(projectId, resourceId, startDate, endDate, travelOutDays, travelBackDays);
+        
+        // Check if we should auto-remove SHOP assignments
+        Project assignmentProject = projectRepository.findById(projectId).orElse(null);
+        if (assignmentProject != null && !assignmentProject.getProjectId().equalsIgnoreCase("SHOP")) {
+            // This is a real project assignment, remove any overlapping SHOP assignments
+            removeOverlappingShopAssignments(resourceId, assignment.getEffectiveStartDate(), assignment.getEffectiveEndDate());
+        }
         
         // Validate business rules
         validateAssignmentBusinessRules(assignment);
@@ -217,6 +317,15 @@ public class SchedulingService {
             throw new IllegalArgumentException("Assignment not found: " + assignment.getId());
         }
         
+        // Check if we should auto-remove SHOP assignments when updating
+        Project assignmentProject = projectRepository.findById(assignment.getProjectId()).orElse(null);
+        if (assignmentProject != null && !assignmentProject.getProjectId().equalsIgnoreCase("SHOP")) {
+            // This is a real project assignment, remove any overlapping SHOP assignments
+            // But exclude the current assignment from removal check
+            removeOverlappingShopAssignmentsExcluding(assignment.getResourceId(), 
+                assignment.getEffectiveStartDate(), assignment.getEffectiveEndDate(), assignment.getId());
+        }
+        
         // If not an override, validate business rules
         if (!assignment.isOverride()) {
             validateAssignmentBusinessRules(assignment);
@@ -240,7 +349,16 @@ public class SchedulingService {
 
     // Query Methods
     public List<Project> getAllProjects() {
-        return projectRepository.findAll();
+        List<Project> projects = projectRepository.findAll();
+        
+        // Debug: Log travel values when projects are loaded
+        if (!projects.isEmpty()) {
+            Project first = projects.get(0);
+            logger.info("getAllProjects: First project {} has travel={}", 
+                first.getProjectId(), first.isTravel());
+        }
+        
+        return projects;
     }
 
     public List<Project> getActiveProjects() {
@@ -273,6 +391,14 @@ public class SchedulingService {
 
     public List<Assignment> getAssignmentsByDateRange(LocalDate startDate, LocalDate endDate) {
         return assignmentRepository.findByDateRange(startDate, endDate);
+    }
+    
+    public List<Assignment> getAssignmentsByProjectId(Long projectId) {
+        return assignmentRepository.findByProjectId(projectId);
+    }
+    
+    public List<Assignment> getAssignmentsByResourceId(Long resourceId) {
+        return assignmentRepository.findByResourceId(resourceId);
     }
 
     public Optional<Project> getProjectById(Long id) {
@@ -371,6 +497,259 @@ public class SchedulingService {
         return getUnavailabilityRepository() != null ? getUnavailabilityRepository().findPendingApproval() : new ArrayList<>();
     }
     
+    // Method to remove SHOP assignments that conflict with a real project assignment
+    private void removeOverlappingShopAssignments(Long resourceId, LocalDate startDate, LocalDate endDate) {
+        removeOverlappingShopAssignmentsExcluding(resourceId, startDate, endDate, null);
+    }
+    
+    // Method to remove SHOP assignments, excluding a specific assignment ID (used when updating)
+    private void removeOverlappingShopAssignmentsExcluding(Long resourceId, LocalDate startDate, LocalDate endDate, Long excludeAssignmentId) {
+        // Find the SHOP project
+        List<Project> allProjects = projectRepository.findAll();
+        Project shopProject = allProjects.stream()
+            .filter(p -> p.getProjectId().equalsIgnoreCase("SHOP"))
+            .findFirst()
+            .orElse(null);
+        
+        if (shopProject == null) {
+            // No SHOP project exists, nothing to remove
+            return;
+        }
+        
+        // Get all assignments for this resource in the date range
+        List<Assignment> resourceAssignments = assignmentRepository.findByResourceId(resourceId);
+        
+        int removedCount = 0;
+        for (Assignment assignment : resourceAssignments) {
+            // Skip if this is the assignment we're updating
+            if (excludeAssignmentId != null && assignment.getId().equals(excludeAssignmentId)) {
+                continue;
+            }
+            
+            // Check if this is a SHOP assignment
+            if (assignment.getProjectId().equals(shopProject.getId())) {
+                // Check if it overlaps with the new assignment period
+                LocalDate assignmentStart = assignment.getStartDate();
+                LocalDate assignmentEnd = assignment.getEndDate();
+                
+                boolean overlaps = !(assignmentEnd.isBefore(startDate) || assignmentStart.isAfter(endDate));
+                
+                if (overlaps) {
+                    // Remove this SHOP assignment
+                    assignmentRepository.delete(assignment.getId());
+                    removedCount++;
+                    logger.info("Removed overlapping SHOP assignment ID {} for resource {} (dates: {} to {})", 
+                        assignment.getId(), resourceId, assignmentStart, assignmentEnd);
+                }
+            }
+        }
+        
+        if (removedCount > 0) {
+            logger.info("Automatically removed {} SHOP assignments that conflicted with new project assignment", removedCount);
+        }
+    }
+    
+    // SHOP Auto-Assignment Methods
+    public int deleteShopAssignments(Project shopProject, List<Resource> selectedResources) {
+        if (shopProject == null) {
+            return 0;
+        }
+        
+        int deletedCount = 0;
+        
+        // Get all SHOP assignments for selected resources
+        List<Assignment> shopAssignments = assignmentRepository.findByProjectId(shopProject.getId());
+        
+        // Filter by selected resources if provided
+        if (selectedResources != null && !selectedResources.isEmpty()) {
+            Set<Long> resourceIds = selectedResources.stream()
+                .map(Resource::getId)
+                .collect(Collectors.toSet());
+            
+            shopAssignments = shopAssignments.stream()
+                .filter(a -> resourceIds.contains(a.getResourceId()))
+                .collect(Collectors.toList());
+        }
+        
+        // Delete the assignments
+        for (Assignment assignment : shopAssignments) {
+            assignmentRepository.delete(assignment.getId());
+            deletedCount++;
+            logger.debug("Deleted SHOP assignment ID {} for resource {}", 
+                assignment.getId(), assignment.getResourceId());
+        }
+        
+        logger.info("Deleted {} SHOP assignments", deletedCount);
+        return deletedCount;
+    }
+    
+    public int autoAssignShopTime(Project shopProject, LocalDate startDate, LocalDate endDate, 
+                                   List<Resource> selectedResources, boolean skipHolidays, boolean excludeWeekends) {
+        logger.info("Starting SHOP auto-assignment: project={}, startDate={}, endDate={}, resources={}, skipHolidays={}, excludeWeekends={}", 
+            shopProject != null ? shopProject.getProjectId() : "null", 
+            startDate, endDate, 
+            selectedResources != null ? selectedResources.size() : 0,
+            skipHolidays, excludeWeekends);
+            
+        if (shopProject == null || !shopProject.getProjectId().equalsIgnoreCase("SHOP")) {
+            logger.error("Invalid SHOP project: {}", shopProject != null ? shopProject.getProjectId() : "null");
+            throw new IllegalArgumentException("Must select a SHOP project");
+        }
+        
+        int assignmentsCreated = 0;
+        List<LocalDate> weekdays = getWeekdays(startDate, endDate, skipHolidays, excludeWeekends);
+        logger.info("Processing {} weekdays for SHOP assignments", weekdays.size());
+        
+        for (Resource resource : selectedResources) {
+            logger.debug("Processing resource: {} (ID: {}, Active: {})", resource.getName(), resource.getId(), resource.isActive());
+            if (!resource.isActive()) {
+                logger.debug("Skipping inactive resource: {}", resource.getName());
+                continue; // Skip inactive resources
+            }
+            
+            // Get existing assignments and unavailability for this resource
+            List<Assignment> existingAssignments = assignmentRepository.findByResourceId(resource.getId());
+            List<TechnicianUnavailability> unavailabilities = getUnavailabilityRepository() != null ?
+                getUnavailabilityRepository().findByResourceId(resource.getId()).stream()
+                    .filter(u -> u.isApproved())
+                    .collect(Collectors.toList()) : new ArrayList<>();
+            
+            // Group consecutive available weekdays into blocks
+            List<LocalDate> availableDays = new ArrayList<>();
+            LocalDate blockStart = null;
+            LocalDate blockEnd = null;
+            int resourceAssignments = 0;
+            
+            for (int i = 0; i <= weekdays.size(); i++) {
+                LocalDate currentDate = i < weekdays.size() ? weekdays.get(i) : null;
+                boolean isAvailable = false;
+                boolean shouldEndBlock = false;
+                
+                if (currentDate != null) {
+                    // Check if resource has any assignment on this date
+                    boolean hasAssignment = existingAssignments.stream()
+                        .anyMatch(a -> !currentDate.isBefore(a.getStartDate()) && !currentDate.isAfter(a.getEndDate()));
+                    
+                    // Check if resource is unavailable on this date
+                    boolean isUnavailable = unavailabilities.stream()
+                        .anyMatch(u -> !currentDate.isBefore(u.getStartDate()) && !currentDate.isAfter(u.getEndDate()));
+                    
+                    isAvailable = !hasAssignment && !isUnavailable;
+                    
+                    if (hasAssignment) {
+                        logger.trace("Resource {} already has assignment on {}", resource.getName(), currentDate);
+                    }
+                    if (isUnavailable) {
+                        logger.trace("Resource {} is unavailable on {}", resource.getName(), currentDate);
+                    }
+                    
+                    // Check if there's a gap (weekend or holiday) between previous date and current date
+                    if (blockEnd != null && ChronoUnit.DAYS.between(blockEnd, currentDate) > 1) {
+                        shouldEndBlock = true; // Gap detected, end current block
+                    }
+                }
+                
+                if (shouldEndBlock || (!isAvailable && blockStart != null) || currentDate == null) {
+                    // End of available block - create assignment if we have a block
+                    if (blockStart != null && blockEnd != null) {
+                        // Create SHOP assignment for this block
+                        Assignment shopAssignment = new Assignment(
+                            shopProject.getId(),
+                            resource.getId(),
+                            blockStart,
+                            blockEnd,
+                            0, 0   // No travel days for SHOP
+                        );
+                        shopAssignment.setNotes("Auto-assigned to SHOP");
+                        shopAssignment.setLocation("Shop Floor");
+                        Assignment saved = assignmentRepository.save(shopAssignment);
+                        assignmentsCreated++;
+                        resourceAssignments++;
+                        
+                        long dayCount = ChronoUnit.DAYS.between(blockStart, blockEnd) + 1;
+                        logger.info("Created SHOP assignment for {} from {} to {} ({} days, Assignment ID: {})", 
+                            resource.getName(), blockStart, blockEnd, dayCount, 
+                            saved != null ? saved.getId() : "null");
+                        
+                        blockStart = null;
+                        blockEnd = null;
+                    }
+                }
+                
+                if (isAvailable && currentDate != null) {
+                    // Start new block or continue current block
+                    if (blockStart == null) {
+                        blockStart = currentDate;
+                        blockEnd = currentDate;
+                    } else {
+                        blockEnd = currentDate;
+                    }
+                }
+            }
+            
+            logger.info("Created {} SHOP assignment blocks for resource {}", resourceAssignments, resource.getName());
+        }
+        
+        logger.info("SHOP auto-assignment complete: created {} total assignments", assignmentsCreated);
+        return assignmentsCreated;
+    }
+    
+    private List<LocalDate> getWeekdays(LocalDate startDate, LocalDate endDate, boolean skipHolidays, boolean excludeWeekends) {
+        List<LocalDate> weekdays = new ArrayList<>();
+        LocalDate current = startDate;
+        
+        logger.info("Getting assignable days from {} to {}, skipHolidays={}, excludeWeekends={}", 
+            startDate, endDate, skipHolidays, excludeWeekends);
+        
+        int skippedWeekends = 0;
+        int skippedHolidays = 0;
+        
+        while (!current.isAfter(endDate)) {
+            // Skip weekends if requested
+            if (excludeWeekends && (current.getDayOfWeek().getValue() > 5)) { // Saturday = 6, Sunday = 7
+                logger.debug("Skipping weekend day: {} ({})", current, current.getDayOfWeek());
+                skippedWeekends++;
+                current = current.plusDays(1);
+                continue;
+            }
+            
+            // Skip holidays if requested
+            if (skipHolidays && isCompanyHoliday(current)) {
+                logger.debug("Skipping holiday: {}", current);
+                skippedHolidays++;
+                current = current.plusDays(1);
+                continue;
+            }
+            
+            weekdays.add(current);
+            current = current.plusDays(1);
+        }
+        
+        logger.info("Returning {} assignable days (skipped {} weekends, {} holidays)", 
+            weekdays.size(), skippedWeekends, skippedHolidays);
+        return weekdays;
+    }
+    
+    private boolean isCompanyHoliday(LocalDate date) {
+        // Check if the date is a company holiday from the Holiday Calendar
+        try {
+            String sql = "SELECT COUNT(*) FROM company_holidays WHERE date = ? AND active = 1";
+            try (Connection conn = dataSource.getConnection();
+                 PreparedStatement stmt = conn.prepareStatement(sql)) {
+                stmt.setString(1, date.toString());
+                try (ResultSet rs = stmt.executeQuery()) {
+                    if (rs.next()) {
+                        return rs.getInt(1) > 0;
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            logger.warn("Failed to check company holidays for date {}: {}", date, e.getMessage());
+            // Fall back to no holiday if database check fails
+        }
+        return false;
+    }
+    
     // Utility Methods
     public int getProjectCount() {
         return (int) projectRepository.count();
@@ -419,6 +798,12 @@ public class SchedulingService {
         // Validate project date boundaries
         validateAssignmentProjectDates(assignment);
         
+        // Get the project for this assignment to check its project ID
+        Project assignmentProject = projectRepository.findById(assignment.getProjectId()).orElse(null);
+        if (assignmentProject == null) {
+            throw new IllegalArgumentException("Project not found: " + assignment.getProjectId());
+        }
+        
         // Check for resource conflicts
         List<Assignment> conflicts = getConflictingAssignments(
             assignment.getResourceId(), 
@@ -432,11 +817,51 @@ public class SchedulingService {
             .filter(a -> !a.isOverride()) // Ignore other overrides
             .toList();
         
-        if (!conflicts.isEmpty()) {
-            throw new IllegalArgumentException(
-                "Resource conflict: Resource is already assigned during this period. " +
-                "Conflicting assignments: " + conflicts.size());
+        // Check for actual conflicts (excluding SHOP assignments which are auto-removed)
+        boolean hasRealConflicts = false;
+        for (Assignment conflict : conflicts) {
+            Project conflictProject = projectRepository.findById(conflict.getProjectId()).orElse(null);
+            if (conflictProject != null) {
+                // Check if it's the same PROJECT ID
+                if (conflictProject.getProjectId().equals(assignmentProject.getProjectId())) {
+                    // Same PROJECT ID - this is not allowed
+                    Resource resource = resourceRepository.findById(assignment.getResourceId()).orElse(null);
+                    String resourceName = resource != null ? resource.getName() : "Resource #" + assignment.getResourceId();
+                    throw new IllegalArgumentException(
+                        String.format("Resource conflict: %s is already assigned to project '%s' during this period. " +
+                                      "A resource cannot be assigned to the same project ID multiple times with overlapping dates.",
+                                      resourceName, assignmentProject.getProjectId()));
+                }
+                // Check if the conflict is with a non-SHOP project
+                if (!conflictProject.getProjectId().equalsIgnoreCase("SHOP")) {
+                    hasRealConflicts = true;
+                }
+            }
         }
+        
+        // If there are conflicts with non-SHOP projects, report them
+        if (hasRealConflicts && !assignmentProject.getProjectId().equalsIgnoreCase("SHOP")) {
+            Resource resource = resourceRepository.findById(assignment.getResourceId()).orElse(null);
+            String resourceName = resource != null ? resource.getName() : "Resource #" + assignment.getResourceId();
+            
+            // Build list of conflicting projects
+            StringBuilder conflictDetails = new StringBuilder();
+            for (Assignment conflict : conflicts) {
+                Project conflictProject = projectRepository.findById(conflict.getProjectId()).orElse(null);
+                if (conflictProject != null && !conflictProject.getProjectId().equalsIgnoreCase("SHOP")) {
+                    if (conflictDetails.length() > 0) conflictDetails.append(", ");
+                    conflictDetails.append(String.format("'%s' (%s to %s)", 
+                        conflictProject.getProjectId(), conflict.getStartDate(), conflict.getEndDate()));
+                }
+            }
+            
+            throw new IllegalArgumentException(
+                String.format("Resource conflict: %s is already assigned to the following projects during this period: %s",
+                              resourceName, conflictDetails.toString()));
+        }
+        
+        // If we get here, conflicts exist but they're for different project IDs, which is now allowed
+        // This enables scenarios like working on "ProjectA Phase 1" and "ProjectA Phase 2" simultaneously
     }
 
     private void validateAssignmentProjectDates(Assignment assignment) {

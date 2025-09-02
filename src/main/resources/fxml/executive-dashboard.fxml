@@ -4,14 +4,12 @@
 <?import javafx.scene.layout.*?>
 <?import javafx.scene.chart.*?>
 <?import javafx.geometry.Insets?>
-<?import javafx.scene.text.*?>
 
 <BorderPane xmlns="http://javafx.com/javafx/17" 
             xmlns:fx="http://javafx.com/fxml/1"
             fx:controller="com.subliminalsearch.simpleprojectresourcemanager.controller.ExecutiveDashboardController"
             prefHeight="800.0" prefWidth="1200.0">
     
-    <!-- Top Menu Bar -->
     <top>
         <VBox>
             <MenuBar>
@@ -25,11 +23,10 @@
                     <MenuItem text="Refresh" onAction="#refreshDashboard" accelerator="F5"/>
                     <CheckMenuItem text="Auto-refresh" fx:id="autoRefreshMenuItem"/>
                     <SeparatorMenuItem/>
-                    <RadioMenuItem text="Monthly View" fx:id="monthlyViewItem" selected="true">
-                        <toggleGroup>
-                            <ToggleGroup fx:id="viewToggleGroup"/>
-                        </toggleGroup>
-                    </RadioMenuItem>
+                    <fx:define>
+                        <ToggleGroup fx:id="viewToggleGroup"/>
+                    </fx:define>
+                    <RadioMenuItem text="Monthly View" fx:id="monthlyViewItem" selected="true" toggleGroup="$viewToggleGroup"/>
                     <RadioMenuItem text="Quarterly View" fx:id="quarterlyViewItem" toggleGroup="$viewToggleGroup"/>
                     <RadioMenuItem text="Annual View" fx:id="annualViewItem" toggleGroup="$viewToggleGroup"/>
                 </Menu>
@@ -49,59 +46,56 @@
                 </Menu>
             </MenuBar>
             
-            <!-- Control Bar -->
             <ToolBar>
                 <Label text="Date Range:"/>
-                <ComboBox fx:id="dateRangeCombo" prefWidth="150">
-                    <value>Last 30 Days</value>
-                </ComboBox>
+                <ComboBox fx:id="dateRangeCombo" prefWidth="150"/>
                 <Separator orientation="VERTICAL"/>
                 <Label text="Project Type:"/>
-                <ComboBox fx:id="projectTypeCombo" prefWidth="120">
-                    <value>All Types</value>
-                </ComboBox>
+                <ComboBox fx:id="projectTypeCombo" prefWidth="120"/>
                 <Separator orientation="VERTICAL"/>
-                <Button text="⟲ Refresh" onAction="#refreshDashboard"/>
+                <Button text="Refresh" onAction="#refreshDashboard"/>
                 <Region HBox.hgrow="ALWAYS"/>
                 <Label fx:id="lastUpdateLabel" text="Last updated: --:--"/>
             </ToolBar>
         </VBox>
     </top>
     
-    <!-- Main Dashboard Content -->
     <center>
         <ScrollPane fitToWidth="true" fitToHeight="true">
-            <VBox spacing="20" padding="20">
+            <VBox spacing="20">
+                <padding>
+                    <Insets top="20" right="20" bottom="20" left="20"/>
+                </padding>
                 
                 <!-- KPI Cards Row -->
                 <HBox spacing="15" alignment="CENTER">
-                    <VBox styleClass="kpi-card" prefWidth="200" prefHeight="100" alignment="CENTER">
-                        <Label text="Active Projects" styleClass="kpi-title"/>
-                        <Label fx:id="activeProjectsLabel" text="--" styleClass="kpi-value"/>
-                        <Label fx:id="projectsTrendLabel" text="↑ 0%" styleClass="kpi-trend"/>
+                    <VBox alignment="CENTER" prefWidth="200" prefHeight="100" style="-fx-border-color: #e0e0e0; -fx-border-width: 1; -fx-padding: 10; -fx-background-color: white;">
+                        <Label text="Active Projects" style="-fx-font-size: 12px; -fx-text-fill: #666;"/>
+                        <Label fx:id="activeProjectsLabel" text="--" style="-fx-font-size: 24px; -fx-font-weight: bold;"/>
+                        <Label fx:id="projectsTrendLabel" text="+0%" style="-fx-font-size: 11px; -fx-text-fill: #4CAF50;"/>
                     </VBox>
                     
-                    <VBox styleClass="kpi-card" prefWidth="200" prefHeight="100" alignment="CENTER">
-                        <Label text="Resource Utilization" styleClass="kpi-title"/>
-                        <Label fx:id="utilizationLabel" text="--%" styleClass="kpi-value"/>
+                    <VBox alignment="CENTER" prefWidth="200" prefHeight="100" style="-fx-border-color: #e0e0e0; -fx-border-width: 1; -fx-padding: 10; -fx-background-color: white;">
+                        <Label text="Resource Utilization" style="-fx-font-size: 12px; -fx-text-fill: #666;"/>
+                        <Label fx:id="utilizationLabel" text="--%" style="-fx-font-size: 24px; -fx-font-weight: bold;"/>
                         <ProgressBar fx:id="utilizationBar" prefWidth="150"/>
                     </VBox>
                     
-                    <VBox styleClass="kpi-card" prefWidth="200" prefHeight="100" alignment="CENTER">
-                        <Label text="On-Time Delivery" styleClass="kpi-title"/>
-                        <Label fx:id="onTimeLabel" text="--%" styleClass="kpi-value"/>
-                        <Label fx:id="onTimeTrendLabel" text="→ 0%" styleClass="kpi-trend"/>
+                    <VBox alignment="CENTER" prefWidth="200" prefHeight="100" style="-fx-border-color: #e0e0e0; -fx-border-width: 1; -fx-padding: 10; -fx-background-color: white;">
+                        <Label text="On-Time Delivery" style="-fx-font-size: 12px; -fx-text-fill: #666;"/>
+                        <Label fx:id="onTimeLabel" text="--%" style="-fx-font-size: 24px; -fx-font-weight: bold;"/>
+                        <Label fx:id="onTimeTrendLabel" text="0%" style="-fx-font-size: 11px; -fx-text-fill: #FFC107;"/>
                     </VBox>
                     
-                    <VBox styleClass="kpi-card" prefWidth="200" prefHeight="100" alignment="CENTER">
-                        <Label text="Monthly Revenue" styleClass="kpi-title"/>
-                        <Label fx:id="revenueLabel" text="$--" styleClass="kpi-value"/>
-                        <Label fx:id="revenueTrendLabel" text="↑ 0%" styleClass="kpi-trend"/>
+                    <VBox alignment="CENTER" prefWidth="200" prefHeight="100" style="-fx-border-color: #e0e0e0; -fx-border-width: 1; -fx-padding: 10; -fx-background-color: white;">
+                        <Label text="Monthly Revenue" style="-fx-font-size: 12px; -fx-text-fill: #666;"/>
+                        <Label fx:id="revenueLabel" text="--" style="-fx-font-size: 24px; -fx-font-weight: bold;"/>
+                        <Label fx:id="revenueTrendLabel" text="+0%" style="-fx-font-size: 11px; -fx-text-fill: #4CAF50;"/>
                     </VBox>
                     
-                    <VBox styleClass="kpi-card" prefWidth="200" prefHeight="100" alignment="CENTER">
-                        <Label text="Completion Rate" styleClass="kpi-title"/>
-                        <Label fx:id="completionLabel" text="--%" styleClass="kpi-value"/>
+                    <VBox alignment="CENTER" prefWidth="200" prefHeight="100" style="-fx-border-color: #e0e0e0; -fx-border-width: 1; -fx-padding: 10; -fx-background-color: white;">
+                        <Label text="Completion Rate" style="-fx-font-size: 12px; -fx-text-fill: #666;"/>
+                        <Label fx:id="completionLabel" text="--%" style="-fx-font-size: 24px; -fx-font-weight: bold;"/>
                         <PieChart fx:id="completionPie" prefHeight="60" prefWidth="60" legendVisible="false"/>
                     </VBox>
                 </HBox>
@@ -109,7 +103,7 @@
                 <!-- Charts Row 1 -->
                 <HBox spacing="20">
                     <VBox spacing="10" HBox.hgrow="ALWAYS">
-                        <Label text="Project Volume Trend" styleClass="chart-title"/>
+                        <Label text="Project Volume Trend" style="-fx-font-size: 16px; -fx-font-weight: bold;"/>
                         <LineChart fx:id="volumeTrendChart" prefHeight="250" animated="false">
                             <xAxis>
                                 <CategoryAxis label="Month"/>
@@ -121,7 +115,7 @@
                     </VBox>
                     
                     <VBox spacing="10" HBox.hgrow="ALWAYS">
-                        <Label text="Project Type Distribution" styleClass="chart-title"/>
+                        <Label text="Project Type Distribution" style="-fx-font-size: 16px; -fx-font-weight: bold;"/>
                         <PieChart fx:id="projectTypeChart" prefHeight="250"/>
                     </VBox>
                 </HBox>
@@ -129,7 +123,7 @@
                 <!-- Charts Row 2 -->
                 <HBox spacing="20">
                     <VBox spacing="10" HBox.hgrow="ALWAYS">
-                        <Label text="Resource Allocation" styleClass="chart-title"/>
+                        <Label text="Resource Allocation" style="-fx-font-size: 16px; -fx-font-weight: bold;"/>
                         <BarChart fx:id="resourceChart" prefHeight="250" animated="false">
                             <xAxis>
                                 <CategoryAxis label="Resource"/>
@@ -141,7 +135,7 @@
                     </VBox>
                     
                     <VBox spacing="10" HBox.hgrow="ALWAYS">
-                        <Label text="Geographic Distribution" styleClass="chart-title"/>
+                        <Label text="Geographic Distribution" style="-fx-font-size: 16px; -fx-font-weight: bold;"/>
                         <StackedBarChart fx:id="geoChart" prefHeight="250" animated="false">
                             <xAxis>
                                 <CategoryAxis label="State"/>
@@ -155,17 +149,19 @@
                 
                 <!-- Alerts Section -->
                 <VBox spacing="10">
-                    <Label text="Alerts & Notifications" styleClass="section-title"/>
-                    <ListView fx:id="alertsList" prefHeight="100" />
+                    <Label text="Alerts and Notifications" style="-fx-font-size: 16px; -fx-font-weight: bold;"/>
+                    <ListView fx:id="alertsList" prefHeight="100"/>
                 </VBox>
                 
             </VBox>
         </ScrollPane>
     </center>
     
-    <!-- Status Bar -->
     <bottom>
-        <HBox styleClass="status-bar" spacing="10" padding="5">
+        <HBox spacing="10" style="-fx-background-color: #f0f0f0;">
+            <padding>
+                <Insets top="5" right="5" bottom="5" left="5"/>
+            </padding>
             <Label fx:id="statusLabel" text="Ready"/>
             <Region HBox.hgrow="ALWAYS"/>
             <Label fx:id="projectCountLabel" text="Projects: 0"/>

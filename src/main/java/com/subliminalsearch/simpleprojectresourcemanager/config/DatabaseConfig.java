@@ -5,6 +5,7 @@ import com.zaxxer.hikari.HikariDataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.sql.ResultSet;
+import java.sql.DatabaseMetaData;
 
 import javax.sql.DataSource;
 import java.io.IOException;
@@ -80,6 +81,62 @@ public class DatabaseConfig {
                 logger.info("Tasks table not found, running task management migration...");
                 runMigration(conn, "002_task_management.sql");
                 logger.info("Task management migration completed successfully");
+            }
+            
+            // Check for and add contact_address column if missing
+            if (!columnExists(conn, "projects", "contact_address")) {
+                logger.info("Adding contact_address column to projects table...");
+                try (Statement stmt = conn.createStatement()) {
+                    stmt.executeUpdate("ALTER TABLE projects ADD COLUMN contact_address TEXT");
+                    logger.info("Successfully added contact_address column");
+                } catch (SQLException e) {
+                    logger.warn("Could not add contact_address column: " + e.getMessage());
+                }
+            }
+            
+            // Check for and add location column to assignments if missing
+            if (!columnExists(conn, "assignments", "location")) {
+                logger.info("Adding location column to assignments table for multi-location support...");
+                try (Statement stmt = conn.createStatement()) {
+                    stmt.executeUpdate("ALTER TABLE assignments ADD COLUMN location VARCHAR(255)");
+                    stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_assignments_location ON assignments(location)");
+                    logger.info("Successfully added location column to assignments");
+                } catch (SQLException e) {
+                    logger.warn("Could not add location column to assignments: " + e.getMessage());
+                }
+            }
+            
+            // Check for and add is_travel column to projects if missing
+            if (!columnExists(conn, "projects", "is_travel")) {
+                logger.info("Adding is_travel column to projects table...");
+                try (Statement stmt = conn.createStatement()) {
+                    stmt.executeUpdate("ALTER TABLE projects ADD COLUMN is_travel BOOLEAN DEFAULT 0");
+                    logger.info("Successfully added is_travel column");
+                } catch (SQLException e) {
+                    logger.warn("Could not add is_travel column: " + e.getMessage());
+                }
+            }
+            
+            // Check for and add client_project_id column to projects if missing
+            if (!columnExists(conn, "projects", "client_project_id")) {
+                logger.info("Adding client_project_id column to projects table...");
+                try (Statement stmt = conn.createStatement()) {
+                    stmt.executeUpdate("ALTER TABLE projects ADD COLUMN client_project_id TEXT");
+                    logger.info("Successfully added client_project_id column");
+                } catch (SQLException e) {
+                    logger.warn("Could not add client_project_id column: " + e.getMessage());
+                }
+            }
+            
+            // Check for and add client_project_description column to projects if missing
+            if (!columnExists(conn, "projects", "client_project_description")) {
+                logger.info("Adding client_project_description column to projects table...");
+                try (Statement stmt = conn.createStatement()) {
+                    stmt.executeUpdate("ALTER TABLE projects ADD COLUMN client_project_description TEXT");
+                    logger.info("Successfully added client_project_description column");
+                } catch (SQLException e) {
+                    logger.warn("Could not add client_project_description column: " + e.getMessage());
+                }
             }
         } catch (SQLException e) {
             logger.error("Failed to initialize database", e);
@@ -193,6 +250,13 @@ public class DatabaseConfig {
         try (Statement stmt = conn.createStatement()) {
             var rs = stmt.executeQuery("SELECT count(*) FROM sqlite_master WHERE type='table' AND name='" + tableName + "'");
             return rs.next() && rs.getInt(1) > 0;
+        }
+    }
+    
+    private boolean columnExists(Connection conn, String tableName, String columnName) throws SQLException {
+        DatabaseMetaData meta = conn.getMetaData();
+        try (ResultSet rs = meta.getColumns(null, null, tableName, columnName)) {
+            return rs.next();
         }
     }
 

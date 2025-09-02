@@ -15,6 +15,7 @@ import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.stage.Stage;
+import com.subliminalsearch.simpleprojectresourcemanager.util.DialogUtils;
 
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
@@ -58,6 +59,10 @@ public class CriticalPathView {
     }
     
     public CriticalPathView(Project project, TaskRepository taskRepository) {
+        this(project, taskRepository, null);
+    }
+    
+    public CriticalPathView(Project project, TaskRepository taskRepository, javafx.stage.Window owner) {
         this.project = project;
         this.taskRepository = taskRepository;
         this.stage = new Stage();
@@ -66,10 +71,14 @@ public class CriticalPathView {
         this.taskLevels = new HashMap<>();
         this.allTasks = new ArrayList<>(); // Initialize to prevent NPE
         
-        initialize();
+        if (owner != null) {
+            this.stage.initOwner(owner);
+        }
+        
+        initialize(owner);
     }
     
-    private void initialize() {
+    private void initialize(javafx.stage.Window owner) {
         stage.setTitle("Critical Path Network - " + project.getProjectId());
         
         // Load task data first, before creating UI components that depend on it
@@ -102,6 +111,13 @@ public class CriticalPathView {
         stage.setScene(scene);
         stage.setMinWidth(1200);
         stage.setMinHeight(800);
+        
+        // Position on the same screen as owner
+        if (owner != null) {
+            DialogUtils.positionStageOnOwnerScreen(stage, owner, 0.9, 0.85);
+        } else {
+            stage.centerOnScreen();
+        }
         
         layoutNodes();
         drawNetwork();
@@ -637,6 +653,18 @@ public class CriticalPathView {
     
     public void show() {
         stage.show();
-        stage.centerOnScreen();
+        stage.toFront();
+        stage.requestFocus();
+        // Temporarily set always on top to ensure it appears above the Task List
+        stage.setAlwaysOnTop(true);
+        // Remove always on top after a short delay
+        javafx.application.Platform.runLater(() -> {
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                // Ignore
+            }
+            javafx.application.Platform.runLater(() -> stage.setAlwaysOnTop(false));
+        });
     }
 }

@@ -1,10 +1,13 @@
 package com.subliminalsearch.simpleprojectresourcemanager.dialog;
 
+import com.subliminalsearch.simpleprojectresourcemanager.dialog.ResourceSkillFilterDialog;
 import com.subliminalsearch.simpleprojectresourcemanager.model.Assignment;
 import com.subliminalsearch.simpleprojectresourcemanager.model.Project;
 import com.subliminalsearch.simpleprojectresourcemanager.model.ProjectManager;
 import com.subliminalsearch.simpleprojectresourcemanager.model.Resource;
 import com.subliminalsearch.simpleprojectresourcemanager.service.SchedulingService;
+import com.subliminalsearch.simpleprojectresourcemanager.util.DialogUtils;
+import com.subliminalsearch.simpleprojectresourcemanager.util.HelpButton;
 import com.subliminalsearch.simpleprojectresourcemanager.util.InputValidator;
 import com.subliminalsearch.simpleprojectresourcemanager.util.InputValidator.ValidationResult;
 import javafx.collections.FXCollections;
@@ -15,6 +18,8 @@ import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
+import javafx.stage.Modality;
+import javafx.stage.Window;
 import javafx.util.Callback;
 import javafx.util.StringConverter;
 import org.slf4j.Logger;
@@ -39,6 +44,7 @@ public class AssignmentDialog extends Dialog<Assignment> {
     private final CheckBox overrideCheckBox;
     private final TextField overrideReasonField;
     private final TextArea notesArea;
+    private final TextField locationField;
     private final Button editProjectButton;
     
     // Filter fields
@@ -126,10 +132,10 @@ public class AssignmentDialog extends Dialog<Assignment> {
         endDatePicker = new DatePicker();
         endDatePicker.setValue(LocalDate.now().plusDays(7));
         
-        travelOutSpinner = new Spinner<>(0, 10, 1);
+        travelOutSpinner = new Spinner<>(0, 10, 0);
         travelOutSpinner.setEditable(true);
         
-        travelBackSpinner = new Spinner<>(0, 10, 1);
+        travelBackSpinner = new Spinner<>(0, 10, 0);
         travelBackSpinner.setEditable(true);
         
         overrideCheckBox = new CheckBox("Override conflicts");
@@ -142,6 +148,9 @@ public class AssignmentDialog extends Dialog<Assignment> {
         notesArea = new TextArea();
         notesArea.setPromptText("Assignment notes (optional)");
         notesArea.setPrefRowCount(2);
+        
+        locationField = new TextField();
+        locationField.setPromptText("Location/Phase (optional, e.g., Dallas, Phase 1)");
         
         // Create project manager combo box
         projectManagerCombo = new ComboBox<>();
@@ -250,6 +259,7 @@ public class AssignmentDialog extends Dialog<Assignment> {
             overrideReasonField.setText(existingAssignment.getOverrideReason() != null ? 
                                       existingAssignment.getOverrideReason() : "");
             notesArea.setText(existingAssignment.getNotes() != null ? existingAssignment.getNotes() : "");
+            locationField.setText(existingAssignment.getLocation() != null ? existingAssignment.getLocation() : "");
         }
         
         // Create form layout
@@ -257,7 +267,48 @@ public class AssignmentDialog extends Dialog<Assignment> {
         
         // Set up dialog pane
         getDialogPane().setContent(grid);
-        getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+        
+        // Create custom Help button type
+        ButtonType helpButtonType = new ButtonType("Help", ButtonBar.ButtonData.HELP);
+        getDialogPane().getButtonTypes().addAll(helpButtonType, ButtonType.OK, ButtonType.CANCEL);
+        
+        // Configure help button
+        Button helpBtn = (Button) getDialogPane().lookupButton(helpButtonType);
+        helpBtn.setOnAction(e -> {
+            HelpButton.showHelpDialog(
+                "Assignment Dialog Help",
+                "**Resource Assignment**\n\n" +
+                "**Project Filters:**\n" +
+                "• **Start Date:** Filter projects by estimated start\n" +
+                "• **Date Range:** ± days tolerance from start date\n" +
+                "• **Project ID:** Filter by project number\n" +
+                "• **Description:** Filter by project description\n\n" +
+                "**Assignment Details:**\n" +
+                "• **Project:** Select target project from dropdown\n" +
+                "• **Resource:** Choose available resource/technician\n" +
+                "• **Project Manager:** Auto-filled from project\n" +
+                "• **Start/End Dates:** Assignment period\n" +
+                "• **Travel Days:** Days needed for travel to/from site\n\n" +
+                "**Conflict Override:**\n" +
+                "• Check to override scheduling conflicts\n" +
+                "• Provide reason for override (required)\n" +
+                "• System will warn about conflicts:\n" +
+                "  - Double booking\n" +
+                "  - Travel time conflicts\n" +
+                "  - Resource unavailability\n\n" +
+                "**Date Entry Tips:**\n" +
+                "• Type dates as MM/DD/YYYY or M/D/YY\n" +
+                "• Use calendar picker for selection\n" +
+                "• Dates auto-validate on entry\n\n" +
+                "**Validation:**\n" +
+                "• End date must be after start date\n" +
+                "• Dates must be within project timeline\n" +
+                "• Resource must be available\n" +
+                "• Travel days cannot be negative",
+                getDialogPane().getScene().getWindow()
+            );
+            e.consume(); // Prevent dialog from closing
+        });
         
         // Enable/disable OK button based on validation
         Button okButton = (Button) getDialogPane().lookupButton(ButtonType.OK);
@@ -437,10 +488,19 @@ public class AssignmentDialog extends Dialog<Assignment> {
         GridPane.setHgrow(projectManagerCombo, Priority.ALWAYS);
         row++;
         
-        // Resource
+        // Resource with skill filter button
         grid.add(new Label("Resource:"), 0, row);
-        grid.add(resourceCombo, 1, row);
-        GridPane.setHgrow(resourceCombo, Priority.ALWAYS);
+        HBox resourceBox = new HBox(10);
+        Button filterBySkillsBtn = new Button("Filter by Skills");
+        filterBySkillsBtn.setOnAction(e -> showSkillFilterDialog());
+        Button clearResourceFilterBtn = new Button("Clear");
+        clearResourceFilterBtn.setVisible(false);
+        clearResourceFilterBtn.setManaged(false);
+        clearResourceFilterBtn.setOnAction(e -> clearResourceFilter());
+        resourceBox.getChildren().addAll(resourceCombo, filterBySkillsBtn, clearResourceFilterBtn);
+        HBox.setHgrow(resourceCombo, Priority.ALWAYS);
+        grid.add(resourceBox, 1, row);
+        GridPane.setHgrow(resourceBox, Priority.ALWAYS);
         row++;
         
         // Start Date
@@ -473,6 +533,12 @@ public class AssignmentDialog extends Dialog<Assignment> {
         grid.add(new Label("Override Reason:"), 0, row);
         grid.add(overrideReasonField, 1, row);
         GridPane.setHgrow(overrideReasonField, Priority.ALWAYS);
+        row++;
+        
+        // Location/Phase
+        grid.add(new Label("Location/Phase:"), 0, row);
+        grid.add(locationField, 1, row);
+        GridPane.setHgrow(locationField, Priority.ALWAYS);
         row++;
         
         // Notes
@@ -597,6 +663,8 @@ public class AssignmentDialog extends Dialog<Assignment> {
                                                    overrideReasonField.getText().trim() : null);
                         assignment.setNotes(notesArea.getText().trim().isEmpty() ? 
                                           null : notesArea.getText().trim());
+                        assignment.setLocation(locationField.getText().trim().isEmpty() ? 
+                                             null : locationField.getText().trim());
                         
                         // Update project's PM if changed
                         if (projectManagerCombo.getValue() != null && projectCombo.getValue() != null) {
@@ -625,6 +693,8 @@ public class AssignmentDialog extends Dialog<Assignment> {
                                                    overrideReasonField.getText().trim() : null);
                         assignment.setNotes(notesArea.getText().trim().isEmpty() ? 
                                           null : notesArea.getText().trim());
+                        assignment.setLocation(locationField.getText().trim().isEmpty() ? 
+                                             null : locationField.getText().trim());
                     }
                     
                     return assignment;
@@ -661,6 +731,7 @@ public class AssignmentDialog extends Dialog<Assignment> {
         ProjectDialog dialog = new ProjectDialog(selectedProject, 
                                                  schedulingService != null ? schedulingService.getProjectRepository() : null, 
                                                  projectManagers);
+        DialogUtils.initializeDialog(dialog, this.getDialogPane().getScene().getWindow());
         Optional<Project> result = dialog.showAndWait();
         
         if (result.isPresent()) {
@@ -962,10 +1033,82 @@ public class AssignmentDialog extends Dialog<Assignment> {
         }
     }
     
+    private void showSkillFilterDialog() {
+        Project selectedProject = projectCombo.getValue();
+        if (selectedProject == null) {
+            Alert alert = new Alert(Alert.AlertType.WARNING);
+            alert.setTitle("Select Project First");
+            alert.setHeaderText(null);
+            alert.setContentText("Please select a project first to filter resources by required skills.");
+            alert.showAndWait();
+            return;
+        }
+        
+        // Show the skill filter dialog
+        ResourceSkillFilterDialog filterDialog = new ResourceSkillFilterDialog(
+            getDialogPane().getScene().getWindow(),
+            availableResources
+        );
+        
+        List<Resource> filteredResources = filterDialog.showAndWait();
+        if (filteredResources != null && !filteredResources.isEmpty()) {
+            
+            // Update the resource combo box with filtered resources
+            Resource currentSelection = resourceCombo.getValue();
+            resourceCombo.setItems(FXCollections.observableArrayList(filteredResources));
+            
+            // Restore selection if still in filtered list
+            if (currentSelection != null && filteredResources.contains(currentSelection)) {
+                resourceCombo.setValue(currentSelection);
+            } else if (filteredResources.size() == 1) {
+                // Auto-select if only one resource matches
+                resourceCombo.setValue(filteredResources.get(0));
+            }
+            
+            // Update the button text to show filter is active
+            HBox resourceBox = (HBox) resourceCombo.getParent();
+            if (resourceBox != null && resourceBox.getChildren().size() >= 3) {
+                Button filterBtn = (Button) resourceBox.getChildren().get(1);
+                filterBtn.setText("Filter by Skills (" + filteredResources.size() + ")");
+                filterBtn.setStyle("-fx-base: #4caf50;");
+                
+                // Show clear button
+                Button clearBtn = (Button) resourceBox.getChildren().get(2);
+                clearBtn.setVisible(true);
+                clearBtn.setManaged(true);
+            }
+        }
+    }
+    
+    private void clearResourceFilter() {
+        // Restore all resources
+        resourceCombo.setItems(FXCollections.observableArrayList(availableResources));
+        
+        // Update buttons
+        HBox resourceBox = (HBox) resourceCombo.getParent();
+        if (resourceBox != null && resourceBox.getChildren().size() >= 3) {
+            Button filterBtn = (Button) resourceBox.getChildren().get(1);
+            filterBtn.setText("Filter by Skills");
+            filterBtn.setStyle("");
+            
+            // Hide clear button
+            Button clearBtn = (Button) resourceBox.getChildren().get(2);
+            clearBtn.setVisible(false);
+            clearBtn.setManaged(false);
+        }
+    }
+    
     /**
      * Show a confirmation dialog before deleting an assignment
      */
     public static boolean showDeleteConfirmation(Assignment assignment, Project project, Resource resource) {
+        return showDeleteConfirmation(assignment, project, resource, null);
+    }
+    
+    /**
+     * Show a confirmation dialog before deleting an assignment with owner window
+     */
+    public static boolean showDeleteConfirmation(Assignment assignment, Project project, Resource resource, Window owner) {
         Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
         alert.setTitle("Delete Assignment");
         alert.setHeaderText("Delete assignment");
@@ -978,6 +1121,11 @@ public class AssignmentDialog extends Dialog<Assignment> {
                             "Resource: " + resourceName + "\n" +
                             "Dates: " + assignment.getStartDate() + " to " + assignment.getEndDate() + "\n\n" +
                             "This action cannot be undone.");
+        
+        if (owner != null) {
+            alert.initOwner(owner);
+            alert.initModality(Modality.WINDOW_MODAL);
+        }
         
         Optional<ButtonType> result = alert.showAndWait();
         return result.isPresent() && result.get() == ButtonType.OK;

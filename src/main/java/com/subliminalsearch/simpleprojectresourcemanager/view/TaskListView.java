@@ -7,12 +7,14 @@ import com.subliminalsearch.simpleprojectresourcemanager.model.Task;
 import com.subliminalsearch.simpleprojectresourcemanager.model.TaskDependency;
 import com.subliminalsearch.simpleprojectresourcemanager.repository.ResourceRepository;
 import com.subliminalsearch.simpleprojectresourcemanager.repository.TaskRepository;
+import com.subliminalsearch.simpleprojectresourcemanager.repository.TaskDependencyRepository;
 import com.subliminalsearch.simpleprojectresourcemanager.service.SchedulingService;
 import com.subliminalsearch.simpleprojectresourcemanager.view.CriticalPathView;
 import com.subliminalsearch.simpleprojectresourcemanager.view.DashboardView;
 import com.subliminalsearch.simpleprojectresourcemanager.view.GanttChartView;
 import com.subliminalsearch.simpleprojectresourcemanager.view.MapView;
 import com.subliminalsearch.simpleprojectresourcemanager.service.SharePointExportService;
+import com.subliminalsearch.simpleprojectresourcemanager.util.DialogUtils;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -142,24 +144,35 @@ public class TaskListView {
     private ComboBox<String> assignedFilter;
     private DatePicker startDateFilter;
     private DatePicker endDateFilter;
+    private TaskDependencyRepository dependencyRepository;
     
     public TaskListView(Project project, TaskRepository taskRepository, List<Resource> resources, 
                        List<Assignment> projectAssignments, SchedulingService schedulingService) {
+        this(project, taskRepository, resources, projectAssignments, schedulingService, null);
+    }
+    
+    public TaskListView(Project project, TaskRepository taskRepository, List<Resource> resources, 
+                       List<Assignment> projectAssignments, SchedulingService schedulingService, javafx.stage.Window owner) {
         this.project = project;
         this.taskRepository = taskRepository;
         this.resourceRepository = schedulingService.getResourceRepository();
         this.resources = resources;
         this.projectAssignments = projectAssignments;
         this.schedulingService = schedulingService;
+        this.dependencyRepository = new TaskDependencyRepository(taskRepository.getDataSource());
         this.stage = new Stage();
         this.stage.initModality(Modality.APPLICATION_MODAL);
         this.stage.setTitle("Task Management - " + project.getProjectId());
         
-        initialize();
+        if (owner != null) {
+            this.stage.initOwner(owner);
+        }
+        
+        initialize(owner);
         loadTasks();
     }
     
-    private void initialize() {
+    private void initialize(javafx.stage.Window owner) {
         VBox root = new VBox(10);
         root.setPadding(new Insets(15));
         
@@ -182,7 +195,13 @@ public class TaskListView {
         stage.setScene(scene);
         stage.setMinWidth(1400);
         stage.setMinHeight(700);
-        stage.centerOnScreen();
+        
+        // Position on the same screen as owner
+        if (owner != null) {
+            DialogUtils.positionStageOnOwnerScreen(stage, owner, 0.95, 0.9);
+        } else {
+            stage.centerOnScreen();
+        }
         
         // Open dashboard view by default after window is shown
         stage.setOnShown(e -> openDashboardView());
@@ -1074,35 +1093,35 @@ public class TaskListView {
     }
     
     private void openKanbanView() {
-        KanbanBoardView kanbanView = new KanbanBoardView(project, taskRepository, resources);
+        KanbanBoardView kanbanView = new KanbanBoardView(project, taskRepository, resources, stage);
         kanbanView.show();
         // Optionally close this view
         // stage.close();
     }
     
     private void openGanttChart() {
-        GanttChartView ganttView = new GanttChartView(project, taskRepository, resources);
+        GanttChartView ganttView = new GanttChartView(project, taskRepository, dependencyRepository, resources, stage);
         ganttView.show();
     }
     
     private void openTimelineView() {
-        ResourceTimelineView timelineView = new ResourceTimelineView(project, taskRepository, resourceRepository);
+        ResourceTimelineView timelineView = new ResourceTimelineView(project, taskRepository, resourceRepository, stage);
         timelineView.show();
     }
     
     private void openCalendarView() {
-        CalendarMatrixView calendarView = new CalendarMatrixView(project, taskRepository, resourceRepository);
+        CalendarMatrixView calendarView = new CalendarMatrixView(project, taskRepository, resourceRepository, stage);
         calendarView.show();
     }
     
     private void openCriticalPathView() {
-        CriticalPathView criticalPathView = new CriticalPathView(project, taskRepository);
+        CriticalPathView criticalPathView = new CriticalPathView(project, taskRepository, stage);
         criticalPathView.show();
     }
     
     private void openDashboardView() {
         try {
-            DashboardView dashboardView = new DashboardView(project, taskRepository, resourceRepository);
+            DashboardView dashboardView = new DashboardView(project, taskRepository, resourceRepository, stage);
             dashboardView.show();
         } catch (Exception e) {
             System.err.println("Error opening Dashboard: " + e.getMessage());
@@ -1118,7 +1137,7 @@ public class TaskListView {
     }
     
     private void openMapView() {
-        MapView mapView = new MapView(project, taskRepository, resourceRepository, schedulingService.getAssignmentRepository());
+        MapView mapView = new MapView(project, taskRepository, resourceRepository, schedulingService.getAssignmentRepository(), stage);
         mapView.show();
     }
     

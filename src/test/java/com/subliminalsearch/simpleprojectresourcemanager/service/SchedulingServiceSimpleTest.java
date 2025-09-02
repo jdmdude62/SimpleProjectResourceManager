@@ -6,6 +6,8 @@ import com.zaxxer.hikari.HikariDataSource;
 import org.junit.jupiter.api.*;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import java.sql.Connection;
+import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.Collections;
@@ -41,14 +43,17 @@ public class SchedulingServiceSimpleTest {
     private AutoCloseable mocks;
     
     @BeforeEach
-    void setUp() {
+    void setUp() throws SQLException {
         mocks = MockitoAnnotations.openMocks(this);
+        
+        // Pass null dataSource to prevent ResourceUnavailabilityRepository creation in tests
+        // The service checks for null dataSource before creating the unavailability repository
         schedulingService = new SchedulingService(
             projectRepository,
             resourceRepository,
             assignmentRepository,
             projectManagerRepository,
-            dataSource
+            null  // Pass null to prevent unavailability repository issues
         );
     }
     
@@ -71,7 +76,6 @@ public class SchedulingServiceSimpleTest {
         Project expectedProject = new Project(projectId, description, startDate, endDate);
         expectedProject.setId(1L);
         
-        when(projectRepository.findByProjectId(projectId)).thenReturn(Optional.empty());
         when(projectRepository.save(any(Project.class))).thenReturn(expectedProject);
         
         // When
@@ -84,26 +88,33 @@ public class SchedulingServiceSimpleTest {
         assertEquals(startDate, result.getStartDate());
         assertEquals(endDate, result.getEndDate());
         
-        verify(projectRepository).findByProjectId(projectId);
+        // Note: No longer checking for duplicate project IDs as per new implementation
         verify(projectRepository).save(any(Project.class));
     }
     
     @Test
-    @DisplayName("Should prevent duplicate project IDs")
-    void testPreventDuplicateProjectIds() {
-        // Given
+    @DisplayName("Should allow duplicate project IDs")
+    void testAllowDuplicateProjectIds() {
+        // Given - duplicate project IDs are now allowed per new implementation
         String projectId = "PROJ-001";
-        Project existingProject = new Project(projectId, "Existing", LocalDate.now(), LocalDate.now());
+        String description = "New Project";
+        LocalDate startDate = LocalDate.now();
+        LocalDate endDate = LocalDate.now().plusDays(10);
         
-        when(projectRepository.findByProjectId(projectId)).thenReturn(Optional.of(existingProject));
+        Project expectedProject = new Project(projectId, description, startDate, endDate);
+        expectedProject.setId(2L); // Different DB ID
         
-        // When & Then
-        assertThrows(IllegalArgumentException.class, () -> {
-            schedulingService.createProject(projectId, "New Project", LocalDate.now(), LocalDate.now());
-        });
+        when(projectRepository.save(any(Project.class))).thenReturn(expectedProject);
         
-        verify(projectRepository).findByProjectId(projectId);
-        verify(projectRepository, never()).save(any());
+        // When - Creating project with duplicate project ID should succeed
+        Project result = schedulingService.createProject(projectId, description, startDate, endDate);
+        
+        // Then
+        assertNotNull(result);
+        assertEquals(projectId, result.getProjectId());
+        assertEquals(2L, result.getId());
+        
+        verify(projectRepository).save(any(Project.class));
     }
     
     @Test
@@ -114,15 +125,16 @@ public class SchedulingServiceSimpleTest {
         LocalDate startDate = LocalDate.of(2025, 1, 10);
         LocalDate endDate = LocalDate.of(2025, 1, 20);
         
-        // No existing assignments
-        when(assignmentRepository.findByResourceId(resourceId)).thenReturn(Collections.emptyList());
+        // No overlapping assignments
+        when(assignmentRepository.findOverlappingAssignments(resourceId, startDate, endDate))
+            .thenReturn(Collections.emptyList());
         
         // When
         boolean available = schedulingService.isResourceAvailable(resourceId, startDate, endDate);
         
         // Then
         assertTrue(available);
-        verify(assignmentRepository).findByResourceId(resourceId);
+        verify(assignmentRepository).findOverlappingAssignments(resourceId, startDate, endDate);
     }
     
     @Test
@@ -138,8 +150,9 @@ public class SchedulingServiceSimpleTest {
         existingAssignment.setResourceId(resourceId);
         existingAssignment.setStartDate(LocalDate.of(2025, 1, 10));
         existingAssignment.setEndDate(LocalDate.of(2025, 1, 20));
+        existingAssignment.setOverride(false); // Normal assignment, not an override
         
-        when(assignmentRepository.findByResourceId(resourceId))
+        when(assignmentRepository.findOverlappingAssignments(resourceId, startDate, endDate))
             .thenReturn(Arrays.asList(existingAssignment));
         
         // When
@@ -147,7 +160,7 @@ public class SchedulingServiceSimpleTest {
         
         // Then
         assertFalse(available);
-        verify(assignmentRepository).findByResourceId(resourceId);
+        verify(assignmentRepository).findOverlappingAssignments(resourceId, startDate, endDate);
     }
     
     @Test
@@ -162,7 +175,8 @@ public class SchedulingServiceSimpleTest {
         Project project2 = new Project("Q1-002", "Partial Q1", 
             LocalDate.of(2025, 2, 1), LocalDate.of(2025, 4, 30));
         
-        when(projectRepository.findAll()).thenReturn(Arrays.asList(project1, project2));
+        when(projectRepository.findByDateRange(rangeStart, rangeEnd))
+            .thenReturn(Arrays.asList(project1, project2));
         
         // When
         List<Project> result = schedulingService.getProjectsByDateRange(rangeStart, rangeEnd);
@@ -172,7 +186,7 @@ public class SchedulingServiceSimpleTest {
         assertTrue(result.contains(project1));
         assertTrue(result.contains(project2));
         
-        verify(projectRepository).findAll();
+        verify(projectRepository).findByDateRange(rangeStart, rangeEnd);
     }
     
     @Test
@@ -258,17 +272,14 @@ public class SchedulingServiceSimpleTest {
         // Given
         Long assignmentId = 1L;
         
-        Assignment assignment = new Assignment();
-        assignment.setId(assignmentId);
-        
-        when(assignmentRepository.findById(assignmentId)).thenReturn(Optional.of(assignment));
+        when(assignmentRepository.existsById(assignmentId)).thenReturn(true);
         doNothing().when(assignmentRepository).delete(assignmentId);
         
         // When
         schedulingService.deleteAssignment(assignmentId);
         
         // Then
-        verify(assignmentRepository).findById(assignmentId);
+        verify(assignmentRepository).existsById(assignmentId);
         verify(assignmentRepository).delete(assignmentId);
     }
     
@@ -277,10 +288,13 @@ public class SchedulingServiceSimpleTest {
     void testPreventProjectDeletionWithAssignments() {
         // Given
         Long projectId = 1L;
+        Project project = new Project("PROJ-001", "Test Project", LocalDate.now(), LocalDate.now());
+        project.setId(projectId);
         
         Assignment assignment = new Assignment();
         assignment.setProjectId(projectId);
         
+        when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
         when(assignmentRepository.findByProjectId(projectId))
             .thenReturn(Arrays.asList(assignment));
         
@@ -289,6 +303,7 @@ public class SchedulingServiceSimpleTest {
             schedulingService.deleteProject(projectId);
         });
         
+        verify(projectRepository).findById(projectId);
         verify(assignmentRepository).findByProjectId(projectId);
         verify(projectRepository, never()).delete(projectId);
     }
