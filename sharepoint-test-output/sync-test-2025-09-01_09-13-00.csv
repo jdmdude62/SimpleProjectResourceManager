@@ -1,0 +1,122 @@
+Timestamp,UserName,UserEmail,ProjectID,ProjectName,StartDate,EndDate,Location
+2025-09-01T09:13:00.177855800,Chris Bina,cbina@captechno.com,25024C,LEI/Calaressss - 5 Sided 380,2025-03-05,2025-03-11,15245 Van Vliet Ave. Chino, CA 91710
+2025-09-01T09:13:00.178855400,Kit Smith,ksmith@captechno.com,24066,USPS Imager,2025-03-09,2025-03-12,Jacksonville, FL
+2025-09-01T09:13:00.179856100,Jeremy Busby,jbusby@captechno.com,24168,USPS CHA Sleever Support,2025-03-10,2025-03-15,1820 W. Pointe Rd. Charlotte, NC 28214
+2025-09-01T09:13:00.180855900,Jordan Wehmeier,jwehmeier@captechno.com,25060,Maersk - 4 Sided/Top Side,2025-03-10,2025-03-14,380 Fort Argyle Road, Savannah, GA
+2025-09-01T09:13:00.181855400,Kenyon Epp,kepp@captechno.com,25060,Maersk - 4 Sided/Top Side,2025-03-10,2025-03-14,380 Fort Argyle Road, Savannah, GA
+2025-09-01T09:13:00.181855400,Mitchel Deuter,mdeuter@captechno.com,25060,Maersk - 4 Sided/Top Side,2025-03-10,2025-03-14,380 Fort Argyle Road, Savannah, GA
+2025-09-01T09:13:00.182866400,Philip Kurutz,pkurutz@captechno.com,25060,Maersk - 4 Sided/Top Side,2025-03-10,2025-03-14,380 Fort Argyle Road, Savannah, GA
+2025-09-01T09:13:00.183856700,Sean Daws,sdaws@captechno.com,24168,USPS CHA Sleever Support,2025-03-10,2025-03-15,1820 W. Pointe Rd. Charlotte, NC 28214
+2025-09-01T09:13:00.183856700,Michael Smith,msmith@captechno.com,24333,Trew/Amazon HWA4 380 A Frame,2025-03-11,2025-03-17,3138 200th ST E Spanaway, Washington, HI 98387
+2025-09-01T09:13:00.184855200,Beau Hines,bhines@captechno.com,25012,Airlite,2025-03-12,2025-03-13,Omaha, NE
+2025-09-01T09:13:00.184855200,Brandon Burge,bburge@captechno.com,22518,Target Hamton Audit,2025-03-24,2025-03-28,Hampton, GA
+2025-09-01T09:13:00.185854700,Chris Bina,cbina@captechno.com,24186,Bastian/Samsonite 2x 5 Sided sorter,2025-03-26,2025-03-31,10480 Yeager Road, Jacksonville, FL 32218
+2025-09-01T09:13:00.185854700,Aries Ramos,aramos@captechno.com,25066,Addverb,2025-03-27,2025-03-31,1900 West Ave S • La Crosse, Wisconsin, CO 54601
+2025-09-01T09:13:00.186854200,Beau Hines,bhines@captechno.com,25066,Addverb,2025-03-27,2025-03-31,1900 West Ave S • La Crosse, Wisconsin, CO 54601
+2025-09-01T09:13:00.187630400,Michael Smith,msmith@captechno.com,24126,PDX8 - Go Live Support,2025-04-13,2025-04-30,TBD
+2025-09-01T09:13:00.188603,Adam Nesbitt,anesbitt@captechno.com,24162,- Cardinal Health,2025-04-21,2025-04-26,9560 HEARTLAND COURT, Columbus, OH
+2025-09-01T09:13:00.189270900,Kit Smith,ksmith@captechno.com,25012,Airlite,2025-04-24,2025-04-24,6110 Abbott Drive, Omaha, NE 68110
+2025-09-01T09:13:00.189270900,Kit Smith,ksmith@captechno.com,25081,GXO DM380 Retrofit,2025-05-01,2025-05-05,7010 N CAJON BLVD SAN BERNARDINO, CA 92407-1899
+2025-09-01T09:13:00.190284700,Michael Smith,msmith@captechno.com,24126,PDX8 - Go Live Support,2025-05-01,2025-05-03,TBD
+2025-09-01T09:13:00.191360200,Aries Ramos,aramos@captechno.com,24162,Cardinal Health,2025-05-07,2025-05-17,9560 HEARTLAND COURT, Columbus, OH
+2025-09-01T09:13:00.191360200,Jeremy Busby,jbusby@captechno.com,24162,Cardinal Health,2025-05-07,2025-05-17,9560 HEARTLAND COURT, Columbus, OH
+2025-09-01T09:13:00.192601200,Chris Bina,cbina@captechno.com,25084C,Target - 1x 5 Sided DM380,2025-05-11,2025-05-17,Target Chicago Flow Center 661-345-8493 3501 S. Pulaski Chicago, IL 60623
+2025-09-01T09:13:00.193601700,Kit Smith,ksmith@captechno.com,25054 USPS Fanuc,Middlesex, MA,2025-05-11,2025-05-16,TBD
+2025-09-01T09:13:00.194601300,Jordan Wehmeier,jwehmeier@captechno.com,25084,Target - 1x 5 Sided DM380,2025-05-12,2025-05-17,Target Chicago Flow Center 661-345-8493 3501 S. Pulaski Chicago, IL 60623
+2025-09-01T09:13:00.195601200,Kenyon Epp,kepp@captechno.com,25084,Target - 1x 5 Sided DM380,2025-05-12,2025-05-17,Target Chicago Flow Center 661-345-8493 3501 S. Pulaski Chicago, IL 60623
+2025-09-01T09:13:00.196601600,Mitchel Deuter,mdeuter@captechno.com,25084,Target - 1x 5 Sided DM380,2025-05-12,2025-05-17,Target Chicago Flow Center 661-345-8493 3501 S. Pulaski Chicago, IL 60623
+2025-09-01T09:13:00.197602500,Philip Kurutz,pkurutz@captechno.com,25084,Target - 1x 5 Sided DM380,2025-05-12,2025-05-17,Target Chicago Flow Center 661-345-8493 3501 S. Pulaski Chicago, IL 60623
+2025-09-01T09:13:00.198602700,Aries Ramos,aramos@captechno.com,25120,TREW/Finish Line - Go Live,2025-05-18,2025-05-23,TBD
+2025-09-01T09:13:00.199601100,Beau Hines,bhines@captechno.com,25078,HOU6 - Totefill,2025-05-19,2025-05-24,10507 Harlem Rd Richmond, TX 77407
+2025-09-01T09:13:00.199601100,Chris Bina,cbina@captechno.com,21389,Fiserv HOU PM,2025-05-19,2025-05-23,TBD
+2025-09-01T09:13:00.200601300,Jeremy Busby,jbusby@captechno.com,25078,HOU6 - Totefill,2025-05-19,2025-05-24,10507 Harlem Rd Richmond, TX 77407
+2025-09-01T09:13:00.201601300,Michael Smith,msmith@captechno.com,25114,Dematic/Ross - LD Tune up,2025-05-19,2025-05-23,23255 W Southern Ave BUCKEYE AZ 85326
+2025-09-01T09:13:00.202602600,Kit Smith,ksmith@captechno.com,25117,USPS - PSM Rebuild,2025-05-21,2025-05-25,7415 COMMONWEALTH AVE JACKSONVILLE, FL 32099
+2025-09-01T09:13:00.203601500,Chris Bina,cbina@captechno.com,25135,Silman/Amazon - DM380 Retrofit,2025-05-27,2025-05-31,1610 Van Buren Easton, Pennsylvania, IA 18045
+2025-09-01T09:13:00.204602200,Sean Daws,sdaws@captechno.com,25135,Silman/Amazon - DM380 Retrofit,2025-05-27,2025-05-31,1610 Van Buren Easton, Pennsylvania, IA 18045
+2025-09-01T09:13:00.205600900,Aries Ramos,aramos@captechno.com,24162,Cardinal Health - Go Live,2025-05-28,2025-05-31,9560 HEARTLAND COURT, Columbus, OH
+2025-09-01T09:13:00.206601100,Aries Ramos,aramos@captechno.com,24162,Cardinal Health - Go Live,2025-06-01,2025-06-04,9560 HEARTLAND COURT, Columbus, OH
+2025-09-01T09:13:00.207601200,Michael Smith,msmith@captechno.com,25138C,Amazon DAB2 - Tote Fill Go Live,2025-06-01,2025-06-07,2519 Bellevue Ave, Daytona Beach, FL 32114
+2025-09-01T09:13:00.207601200,Jeremy Busby,jbusby@captechno.com,25123,CASI/Carhart - LD Commissioning,2025-06-08,2025-06-12,380 Estill Baker Rd. Hanson, US, KY 42413
+2025-09-01T09:13:00.208600800,Chris Bina,cbina@captechno.com,51255,Target Pilot,2025-06-09,2025-06-11,TBD
+2025-09-01T09:13:00.209600700,Michael Smith,msmith@captechno.com,24162,PDX8 - Go Live,2025-06-10,2025-06-16,TBD
+2025-09-01T09:13:00.210601100,Chris Bina,cbina@captechno.com,24156,USPS - JAX Sleever support,2025-06-16,2025-06-21,TBD
+2025-09-01T09:13:00.211601,Kit Smith,ksmith@captechno.com,25054 USPS Fanuc,Boise ID,2025-06-16,2025-06-16,TBD
+2025-09-01T09:13:00.211601,Adam Nesbitt,anesbitt@captechno.com,25147C,Tellworks - DM370 Top read - Commissioning,2025-06-17,2025-06-20,250 Hilton Lane Jeffersonville, Indiana, IN 47130
+2025-09-01T09:13:00.212601300,Jeremy Busby,jbusby@captechno.com,25162,Tompkins/Dematic - Commissioning tune up,2025-06-17,2025-06-20,501 W Wildlife Parkway GRAND PRAIRIE TX 75050 
+2025-09-01T09:13:00.212601300,Aries Ramos,aramos@captechno.com,Amazon SDF6,Go Live,2025-06-18,2025-06-24,120 W. THOMAS P. ECHOLS LANE SHEPHERDSVILLE KY 40165
+2025-09-01T09:13:00.213601100,Jeremy Busby,jbusby@captechno.com,25141C,Ontrac - 2x Tunnel Conversions 3- 5 side,2025-06-22,2025-06-28,1260 London Groveport Rd Lockbourne, OH 43137
+2025-09-01T09:13:00.214601100,Chris Bina,cbina@captechno.com,25168,Cardinal Health - Retrofit,2025-06-23,2025-06-27,9560 HEARTLAND COURT, Columbus, OH
+2025-09-01T09:13:00.214601100,Michael Smith,msmith@captechno.com,24162,PDX8 - Go Live,2025-06-24,2025-06-30,TBD
+2025-09-01T09:13:00.215601400,Kit Smith,ksmith@captechno.com,25054 USPS Fanuc,SanFrancisco CA,2025-06-29,2025-06-30,1300 Evans Ave. Ste. 30 San Francisco, CA 94188
+2025-09-01T09:13:00.216600500,Aries Ramos,aramos@captechno.com,24162,Cardinal Health - Go Live,2025-06-30,2025-06-30,9560 HEARTLAND COURT, Columbus, OH
+2025-09-01T09:13:00.217602100,Chris Bina,cbina@captechno.com,24156,USPS - JAX Sleever support,2025-06-30,2025-06-30,TBD
+2025-09-01T09:13:00.217602100,Aries Ramos,aramos@captechno.com,24162,Cardinal Health - Go Live,2025-07-01,2025-07-03,9560 HEARTLAND COURT, Columbus, OH
+2025-09-01T09:13:00.218661400,Chris Bina,cbina@captechno.com,24156,USPS - JAX Sleever support,2025-07-01,2025-07-05,TBD
+2025-09-01T09:13:00.219327600,Kit Smith,ksmith@captechno.com,25054 USPS Fanuc,SanFrancisco CA,2025-07-01,2025-07-04,1300 Evans Ave. Ste. 30 San Francisco, CA 94188
+2025-09-01T09:13:00.219694200,Aries Ramos,aramos@captechno.com,24162,Cardinal Health - Go Live,2025-07-07,2025-07-11,9560 HEARTLAND COURT, Columbus, OH
+2025-09-01T09:13:00.220904900,Jeremy Busby,jbusby@captechno.com,24162,Cardinal Health - Go Live,2025-07-07,2025-07-11,9560 HEARTLAND COURT, Columbus, OH
+2025-09-01T09:13:00.220904900,Adam Nesbitt,anesbitt@captechno.com,24324,LEI/Knitwell - DM380 Top read,2025-07-13,2025-07-18,1901 IN-240, Greencastle, IN 46135 Green Castle, IN
+2025-09-01T09:13:00.221904300,Aries Ramos,aramos@captechno.com,24162,Cardinal Health - Go Live,2025-07-13,2025-07-18,9560 HEARTLAND COURT, Columbus, OH
+2025-09-01T09:13:00.222904800,Brandon Burge,bburge@captechno.com,25132,Amerisource Bergen - 2x 5 Sided Retrofit,2025-07-14,2025-07-23,6301 LaSalle Drive Lockbourne, OH 43137
+2025-09-01T09:13:00.223596100,Chris Bina,cbina@captechno.com,25132,Amerisource Bergen - 2x 5 Sided Retrofit,2025-07-14,2025-07-24,6301 LaSalle Drive Lockbourne, OH 43137
+2025-09-01T09:13:00.223596100,Didier Presle,dpresle@captechno.com,25156C,Hy Tek - Single read stations x 21,2025-07-14,2025-07-18,1200 Cassville White Road White GA 30184
+2025-09-01T09:13:00.224770600,Jeremy Busby,jbusby@captechno.com,25156C,Hy Tek - Single read stations x 21,2025-07-14,2025-07-18,1200 Cassville White Road White GA 30184
+2025-09-01T09:13:00.224770600,Kit Smith,ksmith@captechno.com,25171,HyTek - 3x 5 sided,2025-07-14,2025-07-18,260 Jordon Rd Tifton, GA 31794
+2025-09-01T09:13:00.225767800,Sean Daws,sdaws@captechno.com,25171,HyTek - 3x 5 sided,2025-07-14,2025-07-18,260 Jordon Rd Tifton, GA 31794
+2025-09-01T09:13:00.226767700,Beau Hines,bhines@captechno.com,25144C,Amazon BSLS - TLH2,2025-07-20,2025-07-23,TBD
+2025-09-01T09:13:00.227768900,Michael Smith,msmith@captechno.com,25144C,Amazon BSLS - TLH2,2025-07-20,2025-07-26,TBD
+2025-09-01T09:13:00.227768900,Adam Nesbitt,anesbitt@captechno.com,25177C,Amazon 14x AFE,2025-07-21,2025-07-26,21300 Walorski Pkwy, Bristol, IN 46507
+2025-09-01T09:13:00.228768200,Aries Ramos,aramos@captechno.com,25177C,Amazon 14x AFE,2025-07-21,2025-07-26,21300 Walorski Pkwy, Bristol, IN 46507
+2025-09-01T09:13:00.228768200,Jeremy Busby,jbusby@captechno.com,24162,Cardinal Health - Go Live,2025-07-21,2025-07-25,9560 HEARTLAND COURT, Columbus, OH
+2025-09-01T09:13:00.229768400,Kit Smith,ksmith@captechno.com,(24312C),Synergy Sketchers - 2 Sided DM370,2025-07-24,2025-07-25,Skechers, Eucalyptus Avenue. Moreno Valey CA, AL 92555
+2025-09-01T09:13:00.230768500,Chris Bina,cbina@captechno.com,25090C,Hy-Tek Jenne,2025-07-25,2025-07-28,Jenne 33665 Chester Road Avon OH 44011 2 Tunnels Top Read & 2 Sided Jonathan Bish 440-471-3436
+2025-09-01T09:13:00.230768500,Sean Daws,sdaws@captechno.com,25195C,WES Tellwork - Side Read Support,2025-07-25,2025-07-28,Tellworks Logistics 250 Hilton Lane Jeffersonville, Indiana  , IN 47130
+2025-09-01T09:13:00.231768200,Aries Ramos,aramos@captechno.com,24162,Cardinal Health - Go Live,2025-07-28,2025-07-31,9560 HEARTLAND COURT, Columbus, OH
+2025-09-01T09:13:00.232768900,Jeremy Busby,jbusby@captechno.com,25189C,Amazon Image only install,2025-07-28,2025-07-31,20526 59th Pl S, Kent, WA 98032
+2025-09-01T09:13:00.232768900,Kit Smith,ksmith@captechno.com,25189C,Amazon Image only install,2025-07-28,2025-07-31,20526 59th Pl S, Kent, WA 98032
+2025-09-01T09:13:00.233770500,Adam Nesbitt,anesbitt@captechno.com,25144C,Amazon BSLS - TLH2,2025-07-29,2025-07-31,2635 Vineland Dr, Tallahassee, FL 32308
+2025-09-01T09:13:00.233770500,Michael Smith,msmith@captechno.com,25138C,DAB2 - Go Live,2025-07-29,2025-07-31,TBD
+2025-09-01T09:13:00.234768500,Adam Nesbitt,anesbitt@captechno.com,25144C,Amazon BSLS - TLH2,2025-08-01,2025-08-01,2635 Vineland Dr, Tallahassee, FL 32308
+2025-09-01T09:13:00.235768200,Aries Ramos,aramos@captechno.com,24162,Cardinal Health - Go Live,2025-08-01,2025-08-01,9560 HEARTLAND COURT, Columbus, OH
+2025-09-01T09:13:00.235768200,Jeremy Busby,jbusby@captechno.com,25189C,Amazon Image only install,2025-08-01,2025-08-03,20526 59th Pl S, Kent, WA 98032
+2025-09-01T09:13:00.236768,Kit Smith,ksmith@captechno.com,25189C,Amazon Image only install,2025-08-01,2025-08-03,20526 59th Pl S, Kent, WA 98032
+2025-09-01T09:13:00.236768,Michael Smith,msmith@captechno.com,25138C,DAB2 - Go Live,2025-08-01,2025-08-04,2519 Bellevue Ave, Daytona Beach, FL 32114
+2025-09-01T09:13:00.237768700,Adam Nesbitt,anesbitt@captechno.com,25144C,Amazon BSLS (13) - LGB3__,2025-08-03,2025-08-09,4950 Goodman Rd, Eastvale, CA 91752
+2025-09-01T09:13:00.238771400,Chris Bina,cbina@captechno.com,25144C,Amazon BSLS (11) - DCA1,2025-08-03,2025-08-09,6885 Commercial Dr, Springfield, VA 22151
+2025-09-01T09:13:00.238771400,Sean Daws,sdaws@captechno.com,25144C,Amazon BSLS - SAN3,2025-08-03,2025-08-09,2020 Piper Ranch Rd, San Diego, CA 92154
+2025-09-01T09:13:00.239768500,Brandon Burge,bburge@captechno.com,25198C,BSLS - Coffin Style,2025-08-05,2025-08-07,MACY'S LOGISTICS WEST VIRGINIA 333 Caperton Blvd Martinsburg, WV   Danny Alexander Danny.Alexander@macys.com 4:30pm-6:00am RETURN TRIP - Original product sent was non-functional so need to get someone back to site. The bottom side scanning system is not functioning onsite. This trip is going in and replacing the solution so installing and commissioning a new BLSL/integrating it with current tunnel., AL 25403
+2025-09-01T09:13:00.239768500,Michael Smith,msmith@captechno.com,25177C,6x AFE,2025-08-05,2025-08-07,21300 Walorski Pkwy, Bristol, IN 46507
+2025-09-01T09:13:00.240768900,Didier Presle,dpresle@captechno.com,25144C,Amazon BSLS (11) - DCA1,2025-08-06,2025-08-09,6885 Commercial Dr, Springfield, VA 22151
+2025-09-01T09:13:00.241768700,Jordan Wehmeier,jwehmeier@captechno.com,25144C,Amazon BSLS (13) - LGB3,2025-08-06,2025-08-09,TBD
+2025-09-01T09:13:00.241768700,Brandon Burge,bburge@captechno.com,25195C,WES Tellworks - Trip 2,2025-08-08,2025-08-11,Tellworks Logistics 250 Hilton Lane Jeffersonville, Indiana  , IN 47130
+2025-09-01T09:13:00.242768800,Aries Ramos,aramos@captechno.com,25144C,Amazon BSLS (10) - GEG1,2025-08-10,2025-08-16,10010 W Geiger Blvd, Spokane, WA 99224
+2025-09-01T09:13:00.243771900,Jeremy Busby,jbusby@captechno.com,25144C,Amazon BSLS (10) - SAN3,2025-08-10,2025-08-15,SAN3 6971 Otay Mesa Rd. San Diego, CA 92154
+2025-09-01T09:13:00.243771900,Kit Smith,ksmith@captechno.com,25144C,Amazon BSLS (13) - BOS3,2025-08-10,2025-08-16,TBD
+2025-09-01T09:13:00.244767600,Sean Daws,sdaws@captechno.com,25144C,Amazon BSLS (15) - MSP1,2025-08-10,2025-08-16,TBD
+2025-09-01T09:13:00.244767600,Jordan Wehmeier,jwehmeier@captechno.com,25144C,Amazon BSLS (10) - OMA2,2025-08-11,2025-08-15,14248 NE-370, Omaha, NE 68138
+2025-09-01T09:13:00.245767400,Aries Ramos,aramos@captechno.com,25144C,Amazon BSLS (11) - CLE2,2025-08-17,2025-08-23,21500 Emery Rd, North Randall, OH 44128
+2025-09-01T09:13:00.246767100,Mitchel Deuter,mdeuter@captechno.com,25144C,Amazon BSLS (3) - BWI2,2025-08-17,2025-08-23,2010 Broening Hwy, Baltimore MD, AL 21224
+2025-09-01T09:13:00.246767100,Chris Bina,cbina@captechno.com,25171C,Hytek Delta Galil,2025-08-18,2025-08-23,Delta Galil 260 Jordon Rd Tifton, ., GA 31794
+2025-09-01T09:13:00.247767200,Jeremy Busby,jbusby@captechno.com,25204C,USPS Adding A1000,2025-08-18,2025-08-22,USPS 3701 W WENDOVER AVE GREENSBORO, NC 27495-0001
+2025-09-01T09:13:00.248767100,Kit Smith,ksmith@captechno.com,25213C,USPS Fanuc,2025-08-18,2025-08-22,4600 Mark IV PKWY, Fort Worth, TX 76161
+2025-09-01T09:13:00.248767100,Michael Smith,msmith@captechno.com,25204C,USPS Adding A1000,2025-08-18,2025-08-22,USPS 3701 W WENDOVER AVE GREENSBORO, NC 27495-0001
+2025-09-01T09:13:00.249767600,Brandon Burge,bburge@captechno.com,25180C,Dematic Amazon RFD2,2025-08-19,2025-08-23,Amazon RFD2, 11500 Freeman Rd, Huntley, IL 60142
+2025-09-01T09:13:00.249767600,Didier Presle,dpresle@captechno.com,25180C,Dematic Amazon RFD2,2025-08-19,2025-08-23,Amazon RFD2, 11500 Freeman Rd, Huntley, IL 60142
+2025-09-01T09:13:00.250767600,Adam Nesbitt,anesbitt@captechno.com,25144C,Amazon BSLS - TLH2,2025-08-20,2025-08-23,2635 Vineland Dr, Tallahassee, FL 32308
+2025-09-01T09:13:00.251767,Adam Nesbitt,anesbitt@captechno.com,25144C,Amazon BSLS(11) - MIA1,2025-08-24,2025-08-30,14000 NW 37th Ave, Opa-locka, FL 33054
+2025-09-01T09:13:00.251767,Aries Ramos,aramos@captechno.com,25144C,Amazon BSLS (13) - LGB3,2025-08-24,2025-08-30,4950 Goodman Wy, Eastvale, CA 91752
+2025-09-01T09:13:00.252767400,Jeremy Busby,jbusby@captechno.com,25144C,Amazon BSLS (11) - DCA1,2025-08-24,2025-08-30,1700 Sparrows Point Blvd, Edgemere, MD 21219
+2025-09-01T09:13:00.252767400,Jordan Wehmeier,jwehmeier@captechno.com,25144C,Amazon BSLS (10) - BOS3,2025-08-24,2025-08-30,1450 Osgood St, North Andover, MA 01845
+2025-09-01T09:13:00.253767400,Kit Smith,ksmith@captechno.com,25213C,USPS Fanuc,2025-08-24,2025-08-28,TBD
+2025-09-01T09:13:00.253767400,Mitchel Deuter,mdeuter@captechno.com,25144C,Amazon BSLS - Anchoring - DCA1,2025-08-24,2025-08-30,1700 Sparrows Point Blvd, Edgemere, MD 21219
+2025-09-01T09:13:00.254767100,Michael Smith,msmith@captechno.com,25144C,Amazon BSLS (10) - GEG1,2025-08-24,2025-08-30,10010 W Geiger Blvd, Spokane, WA 99224
+2025-09-01T09:13:00.255767300,Sean Daws,sdaws@captechno.com,25144C,Amazon BSLS (7) - OXR1,2025-08-24,2025-08-30,3100 Sakioka Dr, Oxnard, CA 93030
+2025-09-01T09:13:00.255767300,Philip Kurutz,pkurutz@captechno.com,25159 PBPS DF2,3 Scan Points,2025-08-25,2025-08-27,3201 E Arkansas Ln, Arlington, TX 76010
+2025-09-01T09:13:00.256767300,Chris Bina,cbina@captechno.com,25174C,Amazon IGQ2 - 5 Sided,2025-08-27,2025-08-31,23257 Central Ave, University Park, IL 60484
+2025-09-01T09:13:00.256767300,Didier Presle,dpresle@captechno.com,25174C,Amazon IGQ2 - 5 Sided,2025-08-27,2025-08-31,23257 Central Ave, University Park, IL 60484
+2025-09-01T09:13:00.257767200,Adam Nesbitt,anesbitt@captechno.com,25144C,Amazon BSLS(11) - OXR1,2025-08-31,2025-08-31,3100 Sakioka Dr, Oxnard, CA 93030
+2025-09-01T09:13:00.257767200,Brandon Burge,bburge@captechno.com,25201C- Amazon FWA4,Logistics Detector,2025-09-02,2025-09-05,Amazon FWA4 9800 SMITH ROAD WAYNE IN 46818 UNITED STATES
+2025-09-01T09:13:00.258767400,Sean Daws,sdaws@captechno.com,25201C- Amazon FWA4,Logistics Detector,2025-09-02,2025-09-05,Amazon FWA4 9800 SMITH ROAD WAYNE IN 46818 UNITED STATES
+2025-09-01T09:13:00.258767400,Adam Nesbitt,anesbitt@captechno.com,25144C,Amazon BSLS(10) - SAT3,2025-09-07,2025-09-12, 6806 Cal Turner Dr, San Antonio, TX 78220
+2025-09-01T09:13:00.259768,Mike Miller,mmiller@captechno.com,25144C,Amazon BSLS(10) - SAT3,2025-09-07,2025-09-12, 6806 Cal Turner Dr, San Antonio, TX 78220

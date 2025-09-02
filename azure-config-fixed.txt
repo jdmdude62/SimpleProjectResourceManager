@@ -1,0 +1,18 @@
+﻿==========================================
+Azure AD Configuration
+Created: 09/01/2025 07:18:47
+==========================================
+
+COPY THESE THREE VALUES TO YOUR JAVA APP:
+
+Tenant ID:     c9e3b7e3-60fd-472d-beb0-dcffda096f4c
+Client ID:     3aa3f497-471b-4192-b3e3-f40ac7ab413b
+Client Secret: OBGEVteafJKMZejuqWXvfYaUoncSv/XbWw6G0lzG5Ug=
+
+Secret Expires: 2027-09-01
+
+==========================================
+NEXT STEPS:
+1. Copy these values to the Java app
+2. Grant admin consent in Azure Portal
+==========================================

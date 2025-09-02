@@ -1,0 +1,46 @@
+Software Enhancements/Improvements:
+
+Bug: The Project Edit Dialog is missing from selection in menu or speed button in toolbar. That included the client information.
+
+Story: As a project managar and scheduler I want to see the address of the project's client in the timeline bar, at the bottom of the bar (3 total lines in the bar vs the current 2)
+
+
+Story: As a Project Manager / Scheduler, I want to assign resources based on the roles they are best at
+Role identification (CRUD):
+ - Identify Certifications
+ - Identify Skills
+
+ 
+ Resources:
+ - assign Certifacations and skills (many to one)
+ - using the roles and skills I would like to select 
+  - It would nice to set a scoring system (1-5)  5 being the most accomplished or highest competency
+  
+
+Story: As a scheduler I need to assign many resources to a project. I would like to select multiples from a list of resources and see whether or not they are in conflict with the project AS i am selecting.
+
+Story: As a project manager I need an "Open Items" per Project (Please research industry best practices).
+   - Very similar to the Task List view
+      - Items replace tasks
+	  - Items are more granular
+	  - Items may/or may not connect to a task
+	  - Will need grid view / Kan Bahn / 
+	  - Apply Est Start Date / Est End Date, Start Date / End Date and progress of each
+		- indicators when something hasn't been done, ontime, late, at risk (industry standard language)
+		
+Need to make this a multi-user application with the database on a network drive:
+   - Four user groups:
+      - Executive Admin: Access to all. Not sure what would be applied at this time, will probably be finance related.
+	  - Administrators: Access to all to date. All Project Managers
+	  - Scheduler: Able to CRUD assignments of resources but not create the project
+	  - Viewer: View of selected areas of the project. Mostly the ability to see their own schedules
+	      - This is the part we really want pushed to Sharepoint
+	      - Resources will be Viewers
+	- Not yet, but need to make allocation to switch to LDAP groups that are yet to be named.
+	   - Probably need a settings page for LDAP connection information:
+	      - This could be an Executive Admin thing
+		  
+Story as a Project Manager or Scheduler, I want to see Resource unavailability of all resources in a grid and timeline kind of view. I want to be able to see conflicts easily
+
+Story: I like the main screen that opens in the beginning, I want a way to print this out, based on a date range, to a wide format pdf for offline viewing.
+		
